@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/jgatlit/projects/visual-flow/prompt-flow-frontend"]
+    },
+    "Context7": {
+      "command": "npx",
+      "args": ["-y", "context7-mcp"]
+    },
+    "Ref": {
+      "command": "npx",
+      "args": ["-y", "@punkpeye/ref-mcp-server"]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { ReactFlow, Background, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, addEdge, ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCallback, useRef, useState } from 'react';
 import type { NodeChange, EdgeChange, Connection } from '@xyflow/react';
@@ -11,8 +11,9 @@ import ExecutionPanel, { type ExecutionHistory } from './components/ExecutionPan
 import { executeFlow } from './services/executionService';
 import type { ExecutionResult } from './utils/executionEngine';
 import { useFlowStore } from './store/flowStore';
+import { useFlowPersistence } from './hooks/useFlowPersistence';
 
-function App() {
+function AppContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [showFlows, setShowFlows] = useState(false);
@@ -20,14 +21,23 @@ function App() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>([]);
   const [currentExecution, setCurrentExecution] = useState<Map<string, ExecutionResult> | null>(null);
-  const [flowTitle, setFlowTitle] = useState('Visual Flow');
-  const [flowDescription, setFlowDescription] = useState('');
 
   const nodes = useFlowStore((state) => state.nodes);
   const edges = useFlowStore((state) => state.edges);
   const setNodes = useFlowStore((state) => state.setNodes);
   const setEdges = useFlowStore((state) => state.setEdges);
   const addNode = useFlowStore((state) => state.addNode);
+
+  // Flow persistence hook
+  const {
+    currentFlowName,
+    autosaveStatus,
+    lastSavedAt,
+    isDirty,
+    saveFlow,
+    newFlow,
+    renameFlow,
+  } = useFlowPersistence({ autosaveEnabled: true, autosaveDelayMs: 2000 });
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -175,13 +185,16 @@ function App() {
         onHistoryClick={() => setShowHistory(!showHistory)}
         onFlowsToggle={() => setShowFlows(!showFlows)}
         onRunFlow={() => handleExecute({})}
+        onSaveFlow={saveFlow}
+        onNewFlow={newFlow}
         isExecuting={isExecuting}
         historyCount={executionHistory.length}
         showFlows={showFlows}
-        flowTitle={flowTitle}
-        flowDescription={flowDescription}
-        onFlowTitleChange={setFlowTitle}
-        onFlowDescriptionChange={setFlowDescription}
+        flowName={currentFlowName}
+        autosaveStatus={autosaveStatus}
+        lastSavedAt={lastSavedAt}
+        isDirty={isDirty}
+        onFlowNameChange={renameFlow}
       />
       <ReactFlow
         nodes={nodes}
@@ -214,6 +227,15 @@ function App() {
         />
       </ReactFlow>
     </div>
+  );
+}
+
+// Wrap AppContent with ReactFlowProvider
+function App() {
+  return (
+    <ReactFlowProvider>
+      <AppContent />
+    </ReactFlowProvider>
   );
 }
 

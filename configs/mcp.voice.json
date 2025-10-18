@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/jgatlit/projects/visual-flow/prompt-flow-frontend"]
+    },
+    "voice-mode": {
+      "command": "node",
+      "args": ["$HOME/.voice-mode/mcp-server/dist/index.js"]
+    }
+  }
+}

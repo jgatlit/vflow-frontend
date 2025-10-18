@@ -1,4 +1,4 @@
-import Dexie, { Table } from 'dexie';
+import Dexie, { type Table } from 'dexie';
 import type { ReactFlowJsonObject } from '@xyflow/react';
 import type { ExecutionResult } from '../utils/executionEngine';
 
@@ -219,10 +219,7 @@ export async function deleteFlow(id: string): Promise<void> {
  */
 export async function getAllFlows(): Promise<Flow[]> {
   return await db.flows
-    .where('deleted')
-    .equals(0) // Dexie treats undefined/false as 0
-    .or('deleted')
-    .equals(undefined)
+    .filter(flow => !flow.deleted)
     .sortBy('updatedAt');
 }
 
@@ -234,7 +231,7 @@ export async function searchFlows(query: string): Promise<Flow[]> {
 
   return await db.flows
     .filter(flow =>
-      !flow.deleted &&
+      (flow.deleted === false || flow.deleted === undefined) &&
       (flow.name.toLowerCase().includes(lowerQuery) ||
        flow.description?.toLowerCase().includes(lowerQuery) ||
        flow.tags?.some(tag => tag.toLowerCase().includes(lowerQuery)))
@@ -247,12 +244,14 @@ export async function searchFlows(query: string): Promise<Flow[]> {
  */
 export async function createExecution(
   flowId: string,
+  flowName: string,
   flowVersion: string,
   input?: Record<string, any>
 ): Promise<Execution> {
   const execution: Execution = {
     id: crypto.randomUUID(),
     flowId,
+    flowName,
     flowVersion,
     status: 'running',
     startedAt: new Date().toISOString(),
@@ -522,7 +521,7 @@ export async function updateFlowWithMetadata(
   id: string,
   updates: Partial<Flow>,
   changeDescription?: string
-): Promise<void> {
+): Promise<Flow> {
   const deviceInfo = getCurrentDeviceInfo();
   const existingFlow = await db.flows.get(id);
 
@@ -543,12 +542,22 @@ export async function updateFlowWithMetadata(
     ];
   }
 
-  await db.flows.update(id, {
+  const updatedData = {
     ...updates,
     updatedAt: new Date().toISOString(),
     lastModifiedOnDevice: deviceInfo,
     versionHistory: updates.version ? versionHistory : existingFlow.versionHistory
-  });
+  };
+
+  await db.flows.update(id, updatedData);
+
+  // Return the updated flow
+  const updatedFlow = await db.flows.get(id);
+  if (!updatedFlow) {
+    throw new Error(`Failed to retrieve updated flow ${id}`);
+  }
+
+  return updatedFlow;
 }
 
 /**
