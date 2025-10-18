@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Rnd } from 'react-rnd';
+import ReactMarkdown from 'react-markdown';
 import { useFlowStore } from '../store/flowStore';
 import { executeFlow } from '../services/executionService';
 import type { ExecutionResult } from '../utils/executionEngine';
@@ -32,6 +33,7 @@ const ExecutionPanel = ({
 }: ExecutionPanelProps) => {
   const [inputVariables, setInputVariables] = useState<Record<string, string>>({});
   const [showInputDialog, setShowInputDialog] = useState(false);
+  const [resultsViewMode, setResultsViewMode] = useState<'markdown' | 'raw'>('markdown');
 
   // Panel position and size state with localStorage persistence
   const [panelPosition, setPanelPosition] = useState(() => {
@@ -162,6 +164,13 @@ const ExecutionPanel = ({
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setResultsViewMode(mode => mode === 'raw' ? 'markdown' : 'raw')}
+                  className="text-xs px-2 py-1 bg-white hover:bg-gray-100 rounded border border-gray-300"
+                  title={resultsViewMode === 'raw' ? 'View as markdown' : 'View raw text'}
+                >
+                  {resultsViewMode === 'raw' ? '📝 Markdown' : '📄 Raw'}
+                </button>
+                <button
                   onClick={resetPanelPosition}
                   className="text-xs px-2 py-1 bg-white hover:bg-gray-100 rounded border border-gray-300"
                   title="Reset position"
@@ -248,8 +257,27 @@ const ExecutionPanel = ({
                     <div className="text-sm text-red-600">
                       Error: {result.error}
                     </div>
+                  ) : resultsViewMode === 'markdown' ? (
+                    <div className="text-sm text-gray-700 max-h-40 overflow-y-auto prose prose-sm max-w-none">
+                      <ReactMarkdown
+                        components={{
+                          h1: ({node, ...props}) => <h1 className="text-base font-bold mt-3 mb-2" {...props} />,
+                          h2: ({node, ...props}) => <h2 className="text-sm font-semibold mt-2 mb-1" {...props} />,
+                          h3: ({node, ...props}) => <h3 className="text-sm font-medium mt-2 mb-1" {...props} />,
+                          p: ({node, ...props}) => <p className="my-1" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc pl-4 my-1" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal pl-4 my-1" {...props} />,
+                          code: ({node, inline, ...props}: any) =>
+                            inline
+                              ? <code className="bg-gray-100 px-1 rounded text-xs font-mono" {...props} />
+                              : <code className="block bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto my-1" {...props} />
+                        }}
+                      >
+                        {result.output}
+                      </ReactMarkdown>
+                    </div>
                   ) : (
-                    <div className="text-sm text-gray-700 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                    <div className="text-sm text-gray-700 whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
                       {result.output}
                     </div>
                   )}
