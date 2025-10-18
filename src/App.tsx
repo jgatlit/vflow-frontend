@@ -159,7 +159,12 @@ function AppContent() {
     setCurrentExecution(null);
 
     try {
-      const results = await executeFlow(nodes, edges, inputVariables);
+      const results = await executeFlow(nodes, edges, inputVariables, {
+        flowId: currentFlowId || undefined,
+        flowName: currentFlowName,
+        flowVersion: '1.0.0', // TODO: Get from flow metadata
+        trackExecution: true, // Enable execution tracking
+      });
       setCurrentExecution(results);
 
       // Add to history
@@ -177,7 +182,7 @@ function AppContent() {
     } finally {
       setIsExecuting(false);
     }
-  }, [nodes, edges, executionHistory]);
+  }, [nodes, edges, executionHistory, currentFlowId, currentFlowName]);
 
   return (
     <div ref={reactFlowWrapper} style={{ width: '100vw', height: '100vh' }}>
@@ -215,7 +220,12 @@ function AppContent() {
         <Controls />
         <MiniMap />
         <NodePalette />
-        <FlowListSidebar isOpen={showFlows} onToggle={() => setShowFlows(!showFlows)} />
+        <FlowListSidebar
+          isOpen={showFlows}
+          currentFlowId={currentFlowId}
+          onLoadFlow={loadFlow}
+          onNewFlow={newFlow}
+        />
         <ExecutionPanel
           isExecuting={isExecuting}
           showHistory={showHistory}

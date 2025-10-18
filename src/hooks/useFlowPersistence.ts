@@ -108,14 +108,27 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   }, [state.currentFlowId, state.currentFlowName, toObject, nodes, edges]);
 
   /**
-   * Load flow from database by ID
+   * Load flow from database by ID and apply to canvas
    */
   const loadFlow = useCallback(async (flowId: string) => {
     try {
+      const { accessFlow } = await import('../db/database');
       const flow = await db.flows.get(flowId);
 
       if (!flow) {
         throw new Error(`Flow not found: ${flowId}`);
+      }
+
+      // Import useFlowStore dynamically to avoid circular dependency
+      const { useFlowStore } = await import('../store/flowStore');
+      const { setNodes, setEdges } = useFlowStore.getState();
+
+      // Apply flow to canvas
+      if (flow.flow.nodes) {
+        setNodes(flow.flow.nodes as any[]);
+      }
+      if (flow.flow.edges) {
+        setEdges(flow.flow.edges as any[]);
       }
 
       // Update access tracking
@@ -133,6 +146,9 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
       // Update refs
       lastSavedNodesRef.current = JSON.stringify(flow.flow.nodes);
       lastSavedEdgesRef.current = JSON.stringify(flow.flow.edges);
+
+      // Store in localStorage
+      localStorage.setItem('lastOpenedFlowId', flow.id);
 
       return flow;
     } catch (error) {

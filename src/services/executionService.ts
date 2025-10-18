@@ -287,17 +287,44 @@ async function executeNotesNode(
 }
 
 /**
- * Execute entire flow
+ * Execute entire flow with database tracking
  */
 export async function executeFlow(
   nodes: Node[],
   edges: Edge[],
-  initialVariables: Record<string, string> = {}
+  initialVariables: Record<string, string> = {},
+  options?: {
+    flowId?: string;
+    flowName?: string;
+    flowVersion?: string;
+    trackExecution?: boolean;
+  }
 ): Promise<Map<string, ExecutionResult>> {
   const context: ExecutionContext = {
     variables: initialVariables,
     results: new Map(),
   };
+
+  // Track execution if enabled and flow info provided
+  let executionId: string | undefined;
+  const startTime = Date.now();
+
+  if (options?.trackExecution && options.flowId && options.flowName && options.flowVersion) {
+    try {
+      const { createExecutionWithMetadata } = await import('../db/database');
+      const execution = await createExecutionWithMetadata(
+        options.flowId,
+        options.flowName,
+        options.flowVersion,
+        initialVariables
+      );
+      executionId = execution.id;
+      console.log('📝 Execution tracking started:', executionId);
+    } catch (error) {
+      console.warn('Failed to create execution record:', error);
+      // Continue execution even if tracking fails
+    }
+  }
 
   // Get execution order
   const executionOrder = topologicalSort(nodes, edges);
@@ -364,5 +391,31 @@ export async function executeFlow(
   }
 
   console.log('🏁 Execution complete. Results:', context.results.size, 'nodes executed');
+
+  // Complete execution tracking if enabled
+  if (executionId) {
+    try {
+      const { completeExecutionWithMetadata } = await import('../db/database');
+      const duration = Date.now() - startTime;
+      const hasErrors = Array.from(context.results.values()).some(r => r.error);
+      const results = Array.from(context.results.entries()).map(([nodeId, result]) => ({
+        ...result,
+        nodeId,
+      }));
+
+      await completeExecutionWithMetadata(
+        executionId,
+        results,
+        hasErrors ? 'failed' : 'completed',
+        hasErrors ? 'One or more nodes failed' : undefined
+      );
+
+      console.log('✅ Execution tracking completed:', executionId, `(${duration}ms)`);
+    } catch (error) {
+      console.warn('Failed to complete execution record:', error);
+      // Don't fail the execution if tracking fails
+    }
+  }
+
   return context.results;
 }
