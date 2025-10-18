@@ -136,9 +136,23 @@ const ExecutionPanel = ({
               return (
                 <div key={nodeId} className={`p-3 rounded-lg border ${result.error ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">
-                      {node?.type?.toUpperCase()} Node
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">
+                        {node?.type?.toUpperCase()} Node
+                      </span>
+                      {result.metadata?.multimodalAnalysis?.mediaAccessed && (
+                        <span
+                          className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-medium"
+                          title={`${result.metadata.multimodalAnalysis.mediaType} analyzed: ${result.metadata.multimodalAnalysis.mediaUrl}`}
+                        >
+                          {result.metadata.multimodalAnalysis.mediaType === 'video' && '🎥'}
+                          {result.metadata.multimodalAnalysis.mediaType === 'image' && '🖼️'}
+                          {result.metadata.multimodalAnalysis.mediaType === 'pdf' && '📄'}
+                          {result.metadata.multimodalAnalysis.mediaType === 'audio' && '🎵'}
+                          {' '}Multimodal
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       {!result.error && (
                         <>
@@ -174,9 +188,16 @@ const ExecutionPanel = ({
                     </div>
                   )}
 
-                  {result.metadata?.tokensUsed && (
-                    <div className="text-xs text-gray-500 mt-2">
-                      Tokens: {result.metadata.tokensUsed}
+                  {(result.metadata?.tokensUsed || result.metadata?.multimodalAnalysis) && (
+                    <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+                      {result.metadata?.tokensUsed && (
+                        <span>Tokens: {result.metadata.tokensUsed}</span>
+                      )}
+                      {result.metadata?.multimodalAnalysis?.processingTime && (
+                        <span className="text-purple-600">
+                          Media: {result.metadata.multimodalAnalysis.processingTime}ms
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>

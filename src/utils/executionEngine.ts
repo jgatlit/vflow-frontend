@@ -9,6 +9,12 @@ export interface ExecutionResult {
     model?: string;
     tokensUsed?: number;
     duration?: number;
+    multimodalAnalysis?: {
+      mediaAccessed: boolean;
+      mediaUrl?: string;
+      mediaType?: 'video' | 'image' | 'pdf' | 'audio';
+      processingTime?: number;
+    };
   };
 }
 

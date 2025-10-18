@@ -114,9 +114,10 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps<GeminiNodeData>) => {
                 checked={data.multimodal || false}
                 onChange={(e) => handleDataChange('multimodal', e.target.checked)}
                 className="w-4 h-4"
+                title="Enable analysis of images, videos (YouTube), PDFs, and audio files"
               />
-              <label className="text-xs font-medium text-gray-600">
-                Multimodal Input (images, video)
+              <label className="text-xs font-medium text-gray-600" title="Supports: YouTube videos, images (JPG/PNG/WebP), PDFs, and audio files">
+                Multimodal Input (video, images, PDF, audio)
               </label>
             </div>
           </div>
