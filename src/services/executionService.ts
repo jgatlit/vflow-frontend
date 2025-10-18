@@ -55,6 +55,7 @@ export async function executeNode(request: NodeExecutionRequest): Promise<Execut
         maxTokens: request.data.maxTokens,
         extendedThinking: request.data.extendedThinking,
         thinkingBudget: request.data.thinkingBudget,
+        multimodal: request.data.multimodal, // Enable Google SDK for images, videos, PDFs
       }),
     });
 
