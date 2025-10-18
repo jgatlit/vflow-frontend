@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Rnd } from 'react-rnd';
 import { useFlowStore } from '../store/flowStore';
 import { executeFlow } from '../services/executionService';
 import type { ExecutionResult } from '../utils/executionEngine';
@@ -31,6 +32,40 @@ const ExecutionPanel = ({
 }: ExecutionPanelProps) => {
   const [inputVariables, setInputVariables] = useState<Record<string, string>>({});
   const [showInputDialog, setShowInputDialog] = useState(false);
+
+  // Panel position and size state with localStorage persistence
+  const [panelPosition, setPanelPosition] = useState(() => {
+    const saved = localStorage.getItem('executionPanelPosition');
+    return saved ? JSON.parse(saved) : {
+      x: typeof window !== 'undefined' ? window.innerWidth - 420 : 0,
+      y: 60
+    };
+  });
+
+  const [panelSize, setPanelSize] = useState(() => {
+    const saved = localStorage.getItem('executionPanelSize');
+    return saved ? JSON.parse(saved) : { width: 400, height: 600 };
+  });
+
+  // Save to localStorage when position/size changes
+  useEffect(() => {
+    localStorage.setItem('executionPanelPosition', JSON.stringify(panelPosition));
+  }, [panelPosition]);
+
+  useEffect(() => {
+    localStorage.setItem('executionPanelSize', JSON.stringify(panelSize));
+  }, [panelSize]);
+
+  // Reset panel position to default
+  const resetPanelPosition = () => {
+    const defaultPos = {
+      x: window.innerWidth - 420,
+      y: 60
+    };
+    const defaultSize = { width: 400, height: 600 };
+    setPanelPosition(defaultPos);
+    setPanelSize(defaultSize);
+  };
 
   const nodes = useFlowStore((state) => state.nodes);
   const edges = useFlowStore((state) => state.edges);
@@ -98,18 +133,49 @@ const ExecutionPanel = ({
         </div>
       )}
 
-      {/* Execution Results Panel */}
+      {/* Execution Results Panel - Draggable & Resizable */}
       {currentExecution && (
-        <div className="absolute top-12 right-4 z-10 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-[calc(100vh-80px)] overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800">Execution Results</h3>
-            <button
-              onClick={() => onSetCurrentExecution(null)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
-          </div>
+        <Rnd
+          position={panelPosition}
+          size={panelSize}
+          onDragStop={(e, d) => setPanelPosition({ x: d.x, y: d.y })}
+          onResizeStop={(e, direction, ref, delta, position) => {
+            setPanelSize({
+              width: parseInt(ref.style.width),
+              height: parseInt(ref.style.height)
+            });
+            setPanelPosition(position);
+          }}
+          minWidth={300}
+          minHeight={200}
+          maxWidth={800}
+          maxHeight={typeof window !== 'undefined' ? window.innerHeight - 100 : 800}
+          bounds="window"
+          dragHandleClassName="drag-handle"
+          style={{ zIndex: 10 }}
+        >
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 h-full overflow-hidden flex flex-col">
+            <div className="drag-handle p-4 border-b border-gray-200 flex items-center justify-between cursor-move bg-gray-50">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400">⋮⋮</span>
+                <h3 className="font-semibold text-gray-800">Execution Results</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={resetPanelPosition}
+                  className="text-xs px-2 py-1 bg-white hover:bg-gray-100 rounded border border-gray-300"
+                  title="Reset position"
+                >
+                  ↺
+                </button>
+                <button
+                  onClick={() => onSetCurrentExecution(null)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {Array.from(currentExecution.entries()).map(([nodeId, result]) => {
@@ -204,7 +270,8 @@ const ExecutionPanel = ({
               );
             })}
           </div>
-        </div>
+          </div>
+        </Rnd>
       )}
 
       {/* History Panel */}
