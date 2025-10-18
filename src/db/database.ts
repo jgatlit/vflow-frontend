@@ -2,40 +2,137 @@ import Dexie, { Table } from 'dexie';
 import type { ReactFlowJsonObject } from '@xyflow/react';
 import type { ExecutionResult } from '../utils/executionEngine';
 
-// Flow database schema
-export interface Flow {
-  id: string; // UUID v4
-  name: string; // Human-readable workflow name
-  description?: string;
-  author?: string;
-  createdAt: string; // ISO 8601
-  updatedAt: string; // ISO 8601
-  tags?: string[]; // Multi-value for categorization
-  version: string; // Semantic versioning (1.0.0)
-  flow: ReactFlowJsonObject; // React Flow's native format
-  deleted?: boolean; // Soft delete
-  deletedAt?: string;
+// Device and environment information
+export interface DeviceInfo {
+  deviceType: 'desktop' | 'mobile' | 'tablet'; // Device category
+  os: string; // Operating system (e.g., "Windows 10", "macOS 14.1", "Linux")
+  browser: string; // Browser name and version
+  screenResolution?: string; // e.g., "1920x1080"
+  timezone?: string; // User's timezone
+  language?: string; // Browser language
+  timestamp: string; // When this info was captured (ISO 8601)
 }
 
-// Execution history schema
-export interface Execution {
+// Flow database schema with comprehensive metadata
+export interface Flow {
+  // Core Identity
   id: string; // UUID v4
+  name: string; // Human-readable workflow name
+  description?: string; // Detailed description of workflow purpose
+
+  // Authorship & Collaboration
+  author?: string; // Primary author/creator
+  contributors?: string[]; // List of contributors
+  organization?: string; // Organization/team name
+
+  // Timestamps (ISO 8601)
+  createdAt: string; // When first created
+  updatedAt: string; // Last modification time
+  lastAccessedAt?: string; // Last time opened/viewed
+  publishedAt?: string; // When published/shared
+
+  // Categorization & Discovery
+  tags?: string[]; // Multi-value tags for categorization
+  category?: string; // Primary category (e.g., "data-processing", "automation")
+  visibility?: 'private' | 'team' | 'public'; // Access level
+
+  // Versioning & History
+  version: string; // Semantic versioning (1.0.0)
+  versionHistory?: { version: string; timestamp: string; changes: string }[];
+  parentFlowId?: string; // If forked/cloned from another flow
+
+  // Device & Environment (auto-populated)
+  createdOnDevice?: DeviceInfo; // Device where created
+  lastModifiedOnDevice?: DeviceInfo; // Device of last modification
+  userAgent?: string; // Browser/client info
+
+  // Usage Statistics
+  executionCount?: number; // Total executions
+  lastExecutedAt?: string; // Last execution timestamp
+  avgExecutionTime?: number; // Average execution duration (ms)
+  successRate?: number; // Percentage of successful executions
+
+  // Status & Lifecycle
+  status?: 'draft' | 'active' | 'archived' | 'deprecated';
+  isTemplate?: boolean; // Is this a reusable template?
+  isFavorite?: boolean; // User favorited
+
+  // Content
+  flow: ReactFlowJsonObject; // React Flow's native format
+  thumbnail?: string; // Base64 or URL to workflow visualization
+  readme?: string; // Markdown documentation
+
+  // Soft Delete
+  deleted?: boolean; // Soft delete flag
+  deletedAt?: string; // When deleted
+  deletedBy?: string; // Who deleted it
+}
+
+// Execution history schema with comprehensive metadata
+export interface Execution {
+  // Core Identity
+  id: string; // UUID v4
+  name?: string; // Optional execution name/label
+  description?: string; // Purpose or notes for this execution
+
+  // Flow Reference
   flowId: string; // Reference to parent flow
+  flowName: string; // Flow name at execution time (for reference)
   flowVersion: string; // Flow version at execution time
+
+  // Status & Timing (ISO 8601)
   status: 'running' | 'completed' | 'failed' | 'cancelled';
-  startedAt: string; // ISO 8601
-  completedAt?: string; // ISO 8601
-  duration?: number; // Milliseconds
-  trigger: 'manual' | 'scheduled' | 'webhook' | 'api';
-  input?: Record<string, any>; // Input variables
-  results: ExecutionResult[]; // Per-node results
+  startedAt: string; // When execution began
+  completedAt?: string; // When execution finished
+  duration?: number; // Total duration in milliseconds
+
+  // Trigger Context
+  trigger: 'manual' | 'scheduled' | 'webhook' | 'api' | 'test'; // How was this triggered
+  triggeredBy?: string; // User or system that triggered
+  triggerMetadata?: Record<string, any>; // Additional trigger context
+
+  // Device & Environment (auto-populated)
+  executedOnDevice?: DeviceInfo; // Device where executed
+  userAgent?: string; // Browser/client info
+  ipAddress?: string; // IP address (if available/relevant)
+
+  // Input & Output
+  input?: Record<string, any>; // Input variables provided
+  output?: any; // Final workflow output
+  results: ExecutionResult[]; // Per-node results with metadata
+
+  // Performance Metrics
+  nodeExecutionTimes?: Record<string, number>; // Time per node (ms)
+  apiCallCount?: number; // Number of API calls made
+  tokensUsed?: number; // Total tokens consumed (for LLM nodes)
+  cacheHits?: number; // Number of cache hits
+  cacheMisses?: number; // Number of cache misses
+
+  // Error Tracking
   error?: string; // Error message if failed
   errorStack?: string; // Stack trace for debugging
+  errorType?: string; // Error classification
   failedNodeId?: string; // Node that caused failure
+  failedNodeName?: string; // Name of failed node
+  retryCount?: number; // Number of retry attempts
+
+  // Logging & Debugging
   logs?: string[]; // Execution logs
+  warnings?: string[]; // Non-fatal warnings
+  debugInfo?: Record<string, any>; // Additional debug data
+
+  // Data Management
   compressed?: boolean; // Whether results are compressed
-  deleted?: boolean; // Soft delete
-  deletedAt?: string;
+  dataSize?: number; // Size of execution data (bytes)
+
+  // Tags & Categorization
+  tags?: string[]; // Custom tags for this execution
+  environment?: 'development' | 'staging' | 'production'; // Environment
+
+  // Soft Delete
+  deleted?: boolean; // Soft delete flag
+  deletedAt?: string; // When deleted
+  deletedBy?: string; // Who deleted it
 }
 
 // Metadata for recent flows tracking
@@ -302,4 +399,320 @@ export function getRecentFlows(): RecentFlow[] {
 export function clearRecentFlows(): void {
   localStorage.removeItem(STORAGE_KEYS.RECENT_FLOWS);
   localStorage.removeItem(STORAGE_KEYS.LAST_FLOW_ID);
+}
+
+// ===== AUTOMATIC METADATA POPULATION =====
+
+/**
+ * Get current device and environment information
+ * Auto-populates device metadata for flows and executions
+ */
+export function getCurrentDeviceInfo(): DeviceInfo {
+  const userAgent = navigator.userAgent;
+
+  // Detect device type
+  let deviceType: 'desktop' | 'mobile' | 'tablet' = 'desktop';
+  if (/Mobile|Android|iPhone|iPod/i.test(userAgent)) {
+    deviceType = 'mobile';
+  } else if (/iPad|Tablet/i.test(userAgent)) {
+    deviceType = 'tablet';
+  }
+
+  // Detect OS
+  let os = 'Unknown';
+  if (userAgent.includes('Win')) os = 'Windows';
+  else if (userAgent.includes('Mac')) os = 'macOS';
+  else if (userAgent.includes('Linux')) os = 'Linux';
+  else if (userAgent.includes('Android')) os = 'Android';
+  else if (userAgent.includes('iOS')) os = 'iOS';
+
+  // Detect browser
+  let browser = 'Unknown';
+  if (userAgent.includes('Firefox')) browser = 'Firefox';
+  else if (userAgent.includes('Chrome')) browser = 'Chrome';
+  else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari';
+  else if (userAgent.includes('Edge')) browser = 'Edge';
+
+  return {
+    deviceType,
+    os,
+    browser,
+    screenResolution: `${window.screen.width}x${window.screen.height}`,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    language: navigator.language,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Create flow with auto-populated metadata
+ * Automatically fills in device info, timestamps, and defaults
+ */
+export async function createFlowWithMetadata(
+  name: string,
+  flow: ReactFlowJsonObject,
+  options?: {
+    description?: string;
+    author?: string;
+    tags?: string[];
+    category?: string;
+    isTemplate?: boolean;
+  }
+): Promise<Flow> {
+  const deviceInfo = getCurrentDeviceInfo();
+
+  const newFlow: Flow = {
+    // Core identity
+    id: crypto.randomUUID(),
+    name,
+    description: options?.description,
+
+    // Authorship
+    author: options?.author,
+    contributors: options?.author ? [options.author] : [],
+
+    // Timestamps (auto-populated)
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    lastAccessedAt: new Date().toISOString(),
+
+    // Categorization
+    tags: options?.tags || [],
+    category: options?.category,
+    visibility: 'private', // Default to private
+
+    // Versioning
+    version: '1.0.0',
+    versionHistory: [{
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      changes: 'Initial creation'
+    }],
+
+    // Device info (auto-populated)
+    createdOnDevice: deviceInfo,
+    lastModifiedOnDevice: deviceInfo,
+    userAgent: navigator.userAgent,
+
+    // Usage statistics (initialized)
+    executionCount: 0,
+    successRate: 0,
+
+    // Status
+    status: 'draft',
+    isTemplate: options?.isTemplate || false,
+    isFavorite: false,
+
+    // Content
+    flow,
+
+    // Soft delete
+    deleted: false
+  };
+
+  await db.flows.add(newFlow);
+  return newFlow;
+}
+
+/**
+ * Update flow with auto-updated metadata
+ * Automatically updates timestamps and device info
+ */
+export async function updateFlowWithMetadata(
+  id: string,
+  updates: Partial<Flow>,
+  changeDescription?: string
+): Promise<void> {
+  const deviceInfo = getCurrentDeviceInfo();
+  const existingFlow = await db.flows.get(id);
+
+  if (!existingFlow) {
+    throw new Error(`Flow ${id} not found`);
+  }
+
+  // Update version history if version changed
+  let versionHistory = existingFlow.versionHistory || [];
+  if (updates.version && updates.version !== existingFlow.version) {
+    versionHistory = [
+      ...versionHistory,
+      {
+        version: updates.version,
+        timestamp: new Date().toISOString(),
+        changes: changeDescription || 'Updated version'
+      }
+    ];
+  }
+
+  await db.flows.update(id, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+    lastModifiedOnDevice: deviceInfo,
+    versionHistory: updates.version ? versionHistory : existingFlow.versionHistory
+  });
+}
+
+/**
+ * Create execution with auto-populated metadata
+ * Automatically fills in device info, flow context, and timestamps
+ */
+export async function createExecutionWithMetadata(
+  flowId: string,
+  input?: Record<string, any>,
+  options?: {
+    name?: string;
+    description?: string;
+    trigger?: Execution['trigger'];
+    triggeredBy?: string;
+    environment?: 'development' | 'staging' | 'production';
+    tags?: string[];
+  }
+): Promise<Execution> {
+  const flow = await db.flows.get(flowId);
+  if (!flow) {
+    throw new Error(`Flow ${flowId} not found`);
+  }
+
+  const deviceInfo = getCurrentDeviceInfo();
+
+  const execution: Execution = {
+    // Core identity
+    id: crypto.randomUUID(),
+    name: options?.name,
+    description: options?.description,
+
+    // Flow reference
+    flowId,
+    flowName: flow.name,
+    flowVersion: flow.version,
+
+    // Status & timing (auto-populated)
+    status: 'running',
+    startedAt: new Date().toISOString(),
+
+    // Trigger context
+    trigger: options?.trigger || 'manual',
+    triggeredBy: options?.triggeredBy,
+
+    // Device & environment (auto-populated)
+    executedOnDevice: deviceInfo,
+    userAgent: navigator.userAgent,
+
+    // Input
+    input,
+
+    // Results (initialized empty)
+    results: [],
+
+    // Performance metrics (initialized)
+    apiCallCount: 0,
+    tokensUsed: 0,
+    cacheHits: 0,
+    cacheMisses: 0,
+    retryCount: 0,
+
+    // Tags
+    tags: options?.tags,
+    environment: options?.environment || 'development',
+
+    // Soft delete
+    deleted: false
+  };
+
+  await db.executions.add(execution);
+
+  // Update flow's last executed timestamp
+  await db.flows.update(flowId, {
+    lastExecutedAt: execution.startedAt,
+    executionCount: (flow.executionCount || 0) + 1
+  });
+
+  return execution;
+}
+
+/**
+ * Complete execution with auto-calculated metrics
+ * Automatically calculates duration, updates flow statistics
+ */
+export async function completeExecutionWithMetadata(
+  id: string,
+  results: ExecutionResult[],
+  options?: {
+    status?: 'completed' | 'failed' | 'cancelled';
+    error?: string;
+    errorStack?: string;
+    errorType?: string;
+    failedNodeId?: string;
+    output?: any;
+    logs?: string[];
+    warnings?: string[];
+  }
+): Promise<void> {
+  const execution = await db.executions.get(id);
+  if (!execution) {
+    throw new Error(`Execution ${id} not found`);
+  }
+
+  const completedAt = new Date().toISOString();
+  const duration = new Date(completedAt).getTime() - new Date(execution.startedAt).getTime();
+
+  // Calculate total tokens used from results
+  const tokensUsed = results.reduce((sum, result) => {
+    return sum + (result.metadata?.tokensUsed || 0);
+  }, 0);
+
+  // Calculate data size
+  const dataSize = new Blob([JSON.stringify({ results, ...options })]).size;
+
+  // Find failed node name if applicable
+  let failedNodeName: string | undefined;
+  if (options?.failedNodeId) {
+    const flow = await db.flows.get(execution.flowId);
+    const failedNode = flow?.flow.nodes.find(n => n.id === options.failedNodeId);
+    failedNodeName = failedNode?.data?.title as string || failedNode?.type;
+  }
+
+  await db.executions.update(id, {
+    status: options?.status || 'completed',
+    completedAt,
+    duration,
+    results,
+    output: options?.output,
+    tokensUsed,
+    dataSize,
+    error: options?.error,
+    errorStack: options?.errorStack,
+    errorType: options?.errorType,
+    failedNodeId: options?.failedNodeId,
+    failedNodeName,
+    logs: options?.logs,
+    warnings: options?.warnings
+  });
+
+  // Update flow statistics
+  const flow = await db.flows.get(execution.flowId);
+  if (flow) {
+    const flowExecutions = await getFlowExecutions(execution.flowId, 100);
+    const completedExecutions = flowExecutions.filter(e => e.status === 'completed');
+    const successRate = (completedExecutions.length / flowExecutions.length) * 100;
+    const avgExecutionTime = completedExecutions.reduce((sum, e) => sum + (e.duration || 0), 0) / completedExecutions.length;
+
+    await db.flows.update(execution.flowId, {
+      successRate: Math.round(successRate * 100) / 100, // Round to 2 decimals
+      avgExecutionTime: Math.round(avgExecutionTime)
+    });
+  }
+}
+
+/**
+ * Access flow (updates lastAccessedAt)
+ */
+export async function accessFlow(flowId: string): Promise<void> {
+  await db.flows.update(flowId, {
+    lastAccessedAt: new Date().toISOString()
+  });
+
+  const flow = await db.flows.get(flowId);
+  if (flow) {
+    saveLastOpenedFlow(flowId, flow.name);
+  }
 }
