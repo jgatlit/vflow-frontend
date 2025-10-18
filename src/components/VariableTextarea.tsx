@@ -21,6 +21,33 @@ const VariableTextarea = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [currentHeight, setCurrentHeight] = useState(minHeight);
+
+  // Auto-resize textarea based on content
+  const adjustHeight = () => {
+    if (textareaRef.current) {
+      // Reset height to min to get accurate scrollHeight
+      textareaRef.current.style.height = minHeight;
+      const scrollHeight = textareaRef.current.scrollHeight;
+
+      // Set to scrollHeight or max 400px
+      const newHeight = Math.min(scrollHeight, 400);
+      const heightPx = `${newHeight}px`;
+
+      textareaRef.current.style.height = heightPx;
+      setCurrentHeight(heightPx);
+
+      // Sync highlight layer height
+      if (highlightRef.current) {
+        highlightRef.current.style.height = heightPx;
+      }
+    }
+  };
+
+  // Adjust height on value change
+  useEffect(() => {
+    adjustHeight();
+  }, [value]);
 
   // Sync scroll between textarea and highlight layer
   const handleScroll = () => {
@@ -42,12 +69,27 @@ const VariableTextarea = ({
 
   const variables = extractVariables(value);
 
+  // Check if content exceeds max height (400px)
+  const hasScrollableContent = textareaRef.current
+    ? textareaRef.current.scrollHeight > 400
+    : false;
+
+  // Count lines in content
+  const lineCount = value ? value.split('\n').length : 0;
+
   return (
     <div className="relative">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {label}
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-sm font-medium text-gray-700">
+            {label}
+          </label>
+          {hasScrollableContent && (
+            <span className="text-xs text-blue-600" title="Scroll to see all content">
+              ⬇️ {lineCount} lines (scrollable)
+            </span>
+          )}
+        </div>
       )}
 
       <div className="relative">
@@ -56,6 +98,7 @@ const VariableTextarea = ({
           ref={highlightRef}
           className={`absolute top-0 left-0 right-0 pointer-events-none overflow-auto whitespace-pre-wrap break-words ${className}`}
           style={{
+            height: currentHeight,
             minHeight,
             padding: '0.5rem 0.75rem',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
@@ -78,7 +121,9 @@ const VariableTextarea = ({
           placeholder={placeholder}
           className={`relative w-full resize-y font-mono text-sm ${className}`}
           style={{
+            height: currentHeight,
             minHeight,
+            maxHeight: '400px',
             padding: '0.5rem 0.75rem',
             background: isFocused ? 'rgba(255, 255, 255, 0.9)' : 'transparent',
             color: isFocused ? '#1f2937' : 'transparent',
@@ -86,7 +131,8 @@ const VariableTextarea = ({
             zIndex: 2,
             border: '1px solid #d1d5db',
             borderRadius: '0.375rem',
-            outline: 'none'
+            outline: 'none',
+            overflowY: hasScrollableContent ? 'auto' : 'hidden'
           }}
         />
       </div>
