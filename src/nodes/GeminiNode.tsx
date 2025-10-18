@@ -13,6 +13,7 @@ export interface GeminiNodeData {
   userPrompt: string;
   hybridReasoning: boolean;
   multimodal: boolean;
+  compactMode?: boolean;
 }
 
 const GeminiNode = memo(({ id, data, selected }: NodeProps<GeminiNodeData>) => {
@@ -41,14 +42,52 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps<GeminiNodeData>) => {
               className="font-semibold text-lg flex-1 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-green-300 rounded px-1"
               placeholder="Node Title"
             />
+            <button
+              onClick={() => handleDataChange('compactMode', !data.compactMode)}
+              className="text-xs px-2 py-1 bg-green-50 hover:bg-green-100 rounded transition-colors"
+              title={data.compactMode ? "Show all settings" : "Compact view"}
+            >
+              {data.compactMode ? '📋 Expand' : '📝 Compact'}
+            </button>
           </div>
           <div className="text-xs text-gray-500 ml-10">ID: {id}</div>
         </div>
 
-        {/* All configs visible inline */}
-        <div className="space-y-3">
-          {/* Model and Temperature */}
-          <div className="grid grid-cols-2 gap-2">
+        {/* Conditional: Compact or Full View */}
+        {data.compactMode ? (
+          /* Compact View - Summary Only */
+          <div className="space-y-2 text-sm text-gray-700">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Model:</span>
+              <span>{data.model}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Config:</span>
+              <span>Temp {data.temperature} • {data.maxTokens} tokens</span>
+            </div>
+            {(data.hybridReasoning || data.multimodal) && (
+              <div className="flex flex-wrap gap-1">
+                {data.hybridReasoning && (
+                  <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                    🧠 Hybrid Reasoning
+                  </span>
+                )}
+                {data.multimodal && (
+                  <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
+                    🎥 Multimodal
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="text-xs text-gray-500 mt-2">
+              Click 📋 Expand to edit settings
+            </div>
+          </div>
+        ) : (
+          /* Full View - All Configs */
+          <div className="space-y-3">
+            {/* Model and Temperature */}
+            <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs font-medium text-gray-600 block mb-1">
                 Model
@@ -153,7 +192,8 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps<GeminiNodeData>) => {
             {data.model === 'gemini-2.5-flash-image' && '🖼️ Image: $0.039 per image'}
             {!data.model?.includes('gemini-2.5') && '💡 Standard Gemini model'}
           </div>
-        </div>
+          </div>
+        )}
       </div>
 
       <Handle
