@@ -157,14 +157,25 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
                 Model
               </label>
               <select
-                value={nodeData.model || 'gemini-2.0-flash-exp'}
+                value={nodeData.model || 'gemini-2.5-flash'}
                 onChange={(e) => handleDataChange('model', e.target.value)}
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1"
               >
-                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B</option>
+                <optgroup label="Gemini 2.5 Series (Latest)">
+                  <option value="gemini-2.5-pro">Gemini 2.5 Pro (Thinking)</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+                </optgroup>
+                <optgroup label="Gemini 2.0 Series">
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                  <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
+                  <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
+                </optgroup>
+                <optgroup label="Gemini 1.5 Series (Deprecated Sept 2025)">
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                  <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B</option>
+                </optgroup>
               </select>
             </div>
             <div>
@@ -339,10 +350,15 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
 
           {/* Model Info */}
           <div className="mt-2 text-xs text-green-600 bg-green-50 rounded px-2 py-1">
-            {nodeData.model === 'gemini-2.0-flash-exp' && '⚡ Experimental: Free while in preview | 1M context'}
-            {nodeData.model === 'gemini-1.5-pro' && '🎯 Pro: $1.25/$5 per 1M | 2M context'}
-            {nodeData.model === 'gemini-1.5-flash' && '⚡ Flash: $0.075/$0.30 per 1M | 1M context'}
-            {nodeData.model === 'gemini-1.5-flash-8b' && '💨 Flash-8B: $0.0375/$0.15 per 1M | 1M context'}
+            {nodeData.model === 'gemini-2.5-pro' && '🧠 2.5 Pro: State-of-the-art thinking model | 1M context'}
+            {nodeData.model === 'gemini-2.5-flash' && '⚡ 2.5 Flash: Best price-performance | 1M context'}
+            {nodeData.model === 'gemini-2.5-flash-lite' && '💨 2.5 Flash-Lite: Cost-efficient | 1M context'}
+            {nodeData.model === 'gemini-2.0-flash' && '⚡ 2.0 Flash: Next-gen features | 1M context'}
+            {nodeData.model === 'gemini-2.0-flash-exp' && '🔬 2.0 Experimental: Free while in preview | 1M context'}
+            {nodeData.model === 'gemini-2.0-flash-lite' && '💨 2.0 Flash-Lite: Fast & efficient | 1M context'}
+            {nodeData.model === 'gemini-1.5-pro' && '🎯 1.5 Pro: $1.25/$5 per 1M | 2M context (Deprecated)'}
+            {nodeData.model === 'gemini-1.5-flash' && '⚡ 1.5 Flash: $0.075/$0.30 per 1M | 1M context (Deprecated)'}
+            {nodeData.model === 'gemini-1.5-flash-8b' && '💨 1.5 Flash-8B: $0.0375/$0.15 per 1M | 1M context (Deprecated)'}
           </div>
           </div>
         )}

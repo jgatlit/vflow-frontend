@@ -19,7 +19,51 @@ export interface ModelCapability {
 }
 
 export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
-  // OpenAI Models
+  // OpenAI Models - GPT-5 Series (Latest)
+  'gpt-5': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 128000,
+    notes: 'GPT-5 flagship model with 400K context, 128K output'
+  },
+  'gpt-5-mini': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 128000,
+    notes: 'Faster, budget-friendly GPT-5 variant'
+  },
+  'gpt-5-nano': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 128000,
+    notes: 'Smallest, fastest, most affordable GPT-5'
+  },
+  // OpenAI Models - GPT-4.1 Series
+  'gpt-4.1': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 16384,
+    notes: 'GPT-4.1 with 1M context, improved coding'
+  },
+  'gpt-4.1-mini': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 16384,
+    notes: 'GPT-4.1 mini variant'
+  },
+  'gpt-4.1-nano': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 16384,
+    notes: 'GPT-4.1 nano variant'
+  },
+  // OpenAI Models - GPT-4o Series
   'gpt-4o': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
@@ -34,6 +78,14 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxOutputTokens: 16384,
     notes: '100% schema compliance with strict mode'
   },
+  'gpt-4o-audio': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 16384,
+    notes: 'Supports audio input/output'
+  },
+  // OpenAI Models - Reasoning Series
   'o3': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
@@ -55,6 +107,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxOutputTokens: 16384,
     notes: 'Latest mini model with structured output'
   },
+  // OpenAI Models - Legacy
   'gpt-4-turbo': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
@@ -70,44 +123,112 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     notes: 'JSON mode only, no strict schema enforcement'
   },
 
-  // Anthropic Models
+  // Anthropic Models - Claude 4.5 Series (Latest)
   'claude-sonnet-4-5-20250929': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
     maxOutputTokens: 8192,
-    notes: 'Tool use pattern for structured output'
+    notes: 'Best for complex agents and coding'
   },
-  'claude-4-5-haiku-20250514': {
+  'claude-haiku-4-5-20251001': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
     maxOutputTokens: 65536,
-    notes: 'Cost-effective with 64K output tokens'
+    notes: 'Fastest Haiku with near-frontier performance'
   },
-  'claude-sonnet-3-5-20241022': {
+  // Anthropic Models - Claude 4 Series
+  'claude-opus-4-1-20250710': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
     maxOutputTokens: 8192,
-    notes: 'Tool use pattern for structured output'
-  },
-  'claude-opus-4-1-20250620': {
-    supportsStructuredOutput: true,
-    supportsJsonMode: true,
-    structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 8192,
-    notes: 'Tool use pattern for structured output'
+    notes: 'Claude Opus 4.1 with extended thinking'
   },
   'claude-opus-4-20250514': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
     maxOutputTokens: 8192,
-    notes: 'Tool use pattern for structured output'
+    notes: 'Claude Opus 4 baseline'
+  },
+  'claude-sonnet-4-20250514': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'tool_use',
+    maxOutputTokens: 8192,
+    notes: 'Claude Sonnet 4 baseline'
+  },
+  // Anthropic Models - Claude 3.7 Series
+  'claude-sonnet-3-7-20250219': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'tool_use',
+    maxOutputTokens: 8192,
+    notes: 'Claude 3.7 Sonnet'
+  },
+  // Anthropic Models - Claude 3.5 Series
+  'claude-sonnet-3-5-20241022': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'tool_use',
+    maxOutputTokens: 8192,
+    notes: 'Claude 3.5 Sonnet (October 2024)'
+  },
+  'claude-sonnet-3-5-20240620': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'tool_use',
+    maxOutputTokens: 8192,
+    notes: 'Claude 3.5 Sonnet (Legacy - June 2024)'
+  },
+  // Anthropic Models - Claude 3 Series (Legacy)
+  'claude-3-opus-20240229': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'tool_use',
+    maxOutputTokens: 4096,
+    notes: 'Claude 3 Opus (Legacy)'
+  },
+  'claude-3-haiku-20240307': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'tool_use',
+    maxOutputTokens: 4096,
+    notes: 'Claude 3 Haiku (Legacy)'
   },
 
-  // Google Gemini Models
+  // Google Gemini Models - 2.5 Series (Latest)
+  'gemini-2.5-pro': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_schema',
+    maxOutputTokens: 65536,
+    notes: 'State-of-the-art thinking model, 1M context'
+  },
+  'gemini-2.5-flash': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_schema',
+    maxOutputTokens: 65536,
+    notes: 'Best price-performance with thinking, 1M context'
+  },
+  'gemini-2.5-flash-lite': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_schema',
+    maxOutputTokens: 65536,
+    notes: 'Cost-efficient high throughput, 1M context'
+  },
+  // Google Gemini Models - 2.0 Series
+  'gemini-2.0-flash': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_schema',
+    maxOutputTokens: 8192,
+    notes: 'Next-gen features, 1M context'
+  },
   'gemini-2.0-flash-exp': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
@@ -115,26 +236,34 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxOutputTokens: 8192,
     notes: 'Experimental model with response_schema'
   },
+  'gemini-2.0-flash-lite': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_schema',
+    maxOutputTokens: 8192,
+    notes: 'Cost-optimized, low latency'
+  },
+  // Google Gemini Models - 1.5 Series (Deprecated Sept 2025)
   'gemini-1.5-pro': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_schema',
     maxOutputTokens: 8192,
-    notes: 'Native response_schema support'
+    notes: 'Native response_schema support (Deprecated)'
   },
   'gemini-1.5-flash': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_schema',
     maxOutputTokens: 8192,
-    notes: 'Native response_schema support'
+    notes: 'Native response_schema support (Deprecated)'
   },
   'gemini-1.5-flash-8b': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_schema',
     maxOutputTokens: 8192,
-    notes: 'Lightweight model with response_schema'
+    notes: 'Lightweight model with response_schema (Deprecated)'
   },
 };
 
