@@ -1,10 +1,10 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { useFlowStore } from '../store/flowStore';
 import VariableTextarea from '../components/VariableTextarea';
 import { supportsStructuredOutput } from '../config/modelCapabilities';
-import { csvFieldsToJsonSchema, jsonSchemaToCSVFields } from '../utils/formatConversion';
+import { csvFieldsToJsonSchema, jsonSchemaToCSVFields, jsonSchemaToMarkdown, csvFieldsToMarkdown } from '../utils/formatConversion';
 
 export interface OpenAINodeData {
   title?: string;
@@ -25,9 +25,30 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as OpenAINodeData;
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
   const previousOutputFormatRef = useRef<string | undefined>(nodeData.outputFormat);
+  const [copied, setCopied] = useState(false);
 
   const handleDataChange = (field: keyof OpenAINodeData, value: string | number | boolean) => {
     updateNodeData(id, { [field]: value });
+  };
+
+  const handleCopyMarkdown = async () => {
+    let markdown = '';
+
+    if (nodeData.outputFormat === 'json' && nodeData.jsonSchema) {
+      markdown = jsonSchemaToMarkdown(nodeData.jsonSchema);
+    } else if (nodeData.outputFormat === 'csv' && nodeData.csvFields) {
+      markdown = csvFieldsToMarkdown(nodeData.csvFields);
+    }
+
+    if (markdown) {
+      try {
+        await navigator.clipboard.writeText(markdown);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy markdown:', err);
+      }
+    }
   };
 
   // Auto-convert between CSV and JSON formats when output format changes
@@ -248,9 +269,20 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
                 {/* JSON Schema Input */}
                 {nodeData.outputFormat === 'json' && (
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">
-                      JSON Schema (optional - for strict validation)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-gray-600">
+                        JSON Schema (optional - for strict validation)
+                      </label>
+                      {nodeData.jsonSchema && nodeData.jsonSchema.trim() && (
+                        <button
+                          onClick={handleCopyMarkdown}
+                          className="text-xs px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors flex items-center gap-1"
+                          title="Copy markdown structure for prompt"
+                        >
+                          {copied ? '✓ Copied!' : '📋 Copy Structure'}
+                        </button>
+                      )}
+                    </div>
                     <textarea
                       value={nodeData.jsonSchema || ''}
                       onChange={(e) => handleDataChange('jsonSchema', e.target.value)}
@@ -266,9 +298,20 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
                 {/* CSV Fields Input */}
                 {nodeData.outputFormat === 'csv' && (
                   <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">
-                      CSV Fields (comma-separated)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-gray-600">
+                        CSV Fields (comma-separated)
+                      </label>
+                      {nodeData.csvFields && nodeData.csvFields.trim() && (
+                        <button
+                          onClick={handleCopyMarkdown}
+                          className="text-xs px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors flex items-center gap-1"
+                          title="Copy markdown structure for prompt"
+                        >
+                          {copied ? '✓ Copied!' : '📋 Copy Structure'}
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="text"
                       value={nodeData.csvFields || ''}
