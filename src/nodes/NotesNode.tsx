@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import { useFlowStore } from '../store/flowStore';
@@ -12,9 +12,37 @@ export interface NotesNodeData {
   outputVariable?: string;
 }
 
+/**
+ * Helper function to detect and pretty-print JSON content
+ */
+function formatIfJSON(content: string): string {
+  if (!content || typeof content !== 'string') {
+    return content;
+  }
+
+  // Try to detect JSON by looking for common patterns
+  const trimmed = content.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    return content;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    // Not valid JSON, return as-is
+    return content;
+  }
+}
+
 const NotesNode = memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as NotesNodeData;
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
+
+  // Auto-format JSON content for display
+  const displayContent = useMemo(() => {
+    return formatIfJSON(nodeData.content || '');
+  }, [nodeData.content]);
 
   const handleDataChange = (field: keyof NotesNodeData, value: string | boolean) => {
     updateNodeData(id, { [field]: value });
@@ -101,13 +129,13 @@ const NotesNode = memo(({ id, data, selected }: NodeProps) => {
         {/* Content */}
         <div>
           <textarea
-            value={nodeData.content || ''}
+            value={displayContent}
             onChange={(e) => handleDataChange('content', e.target.value)}
-            className={`w-full min-h-[120px] ${currentColor.bg} ${currentColor.text} border-none outline-none resize-y font-mono text-sm`}
+            className={`w-full min-h-[120px] ${currentColor.bg} ${currentColor.text} border-none outline-none resize-y font-mono text-sm whitespace-pre-wrap`}
             placeholder={
               nodeData.varMode
                 ? "Add template with variables...&#10;&#10;Use {{1}}, {{2}} for inputs&#10;Use {{nodeId}} for specific nodes&#10;&#10;Example:&#10;# Result&#10;Input: {{1}}&#10;Output: Processed..."
-                : "Add your notes here...&#10;&#10;Supports markdown:&#10;- **bold**&#10;- *italic*&#10;- # Heading&#10;- - List item&#10;&#10;Enable 'Process Variables' to use {{var}} syntax"
+                : "Add your notes here...&#10;&#10;Supports markdown:&#10;- **bold**&#10;- *italic*&#10;- # Heading&#10;- - List item&#10;&#10;Enable 'Process Variables' to use {{var}} syntax&#10;&#10;JSON will be auto-formatted"
             }
           />
         </div>

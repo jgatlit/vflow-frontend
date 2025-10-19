@@ -63,12 +63,37 @@ export async function executeNode(request: NodeExecutionRequest): Promise<Execut
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Execution failed');
+      // Try to parse error response as JSON, fallback to text
+      let errorMessage = 'Execution failed';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } else {
+          errorMessage = await response.text();
+        }
+      } catch (e) {
+        // Fallback to status text if parsing fails
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
-    const data = await response.json();
+    // Parse response body with better error handling
+    let data: any;
     const duration = Date.now() - startTime;
+
+    try {
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Expected JSON response but got: ${contentType || 'unknown'}\n${text.substring(0, 200)}`);
+      }
+      data = await response.json();
+    } catch (parseError: any) {
+      throw new Error(`Failed to parse API response: ${parseError.message}`);
+    }
 
     return {
       nodeId: request.nodeId,
@@ -136,7 +161,21 @@ export async function* executeNodeStream(
     });
 
     if (!response.ok) {
-      throw new Error('Streaming failed');
+      // Try to get error message from response
+      let errorMessage = 'Streaming failed';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } else {
+          const text = await response.text();
+          errorMessage = text || response.statusText || errorMessage;
+        }
+      } catch (e) {
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
     }
 
     const reader = response.body?.getReader();
@@ -412,12 +451,24 @@ export async function executeFlow(
         }
 
         if (jsonData) {
+          // Helper function to convert value to string properly
+          const valueToString = (value: any): string => {
+            if (value === null || value === undefined) {
+              return String(value);
+            }
+            if (typeof value === 'object') {
+              return JSON.stringify(value, null, 2);
+            }
+            return String(value);
+          };
+
           // If it's an object, store each field as nodeId.fieldName
           if (typeof jsonData === 'object' && !Array.isArray(jsonData)) {
             Object.keys(jsonData).forEach(key => {
               const varName = `${outputVarName}.${key}`;
-              context.variables[varName] = String(jsonData[key]);
-              console.log(`  📊 Created variable: {{${varName}}} = ${String(jsonData[key]).substring(0, 50)}${String(jsonData[key]).length > 50 ? '...' : ''}`);
+              const stringValue = valueToString(jsonData[key]);
+              context.variables[varName] = stringValue;
+              console.log(`  📊 Created variable: {{${varName}}} = ${stringValue.substring(0, 50)}${stringValue.length > 50 ? '...' : ''}`);
             });
           }
           // If it's an array, store with indexes
@@ -426,7 +477,8 @@ export async function executeFlow(
               if (typeof item === 'object') {
                 Object.keys(item).forEach(key => {
                   const varName = `${outputVarName}[${index}].${key}`;
-                  context.variables[varName] = String(item[key]);
+                  const stringValue = valueToString(item[key]);
+                  context.variables[varName] = stringValue;
                 });
               } else {
                 const varName = `${outputVarName}[${index}]`;

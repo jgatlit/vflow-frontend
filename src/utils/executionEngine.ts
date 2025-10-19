@@ -115,6 +115,10 @@ export function substituteVariables(
     const result = context.results.get(nodeId);
 
     if (result) {
+      // If the result has structured data (JSON), stringify it for display
+      if (result.metadata?.structuredData) {
+        return JSON.stringify(result.metadata.structuredData, null, 2);
+      }
       return result.output;
     }
 
