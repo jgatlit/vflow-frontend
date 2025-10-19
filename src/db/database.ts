@@ -372,19 +372,37 @@ const STORAGE_KEYS = {
 };
 
 export function saveLastOpenedFlow(flowId: string, flowName: string): void {
-  localStorage.setItem(STORAGE_KEYS.LAST_FLOW_ID, flowId);
+  try {
+    localStorage.setItem(STORAGE_KEYS.LAST_FLOW_ID, flowId);
 
-  // Update recent flows list (keep last 10)
-  const recent: RecentFlow[] = JSON.parse(
-    localStorage.getItem(STORAGE_KEYS.RECENT_FLOWS) || '[]'
-  );
+    // Update recent flows list (keep last 10)
+    const recent: RecentFlow[] = JSON.parse(
+      localStorage.getItem(STORAGE_KEYS.RECENT_FLOWS) || '[]'
+    );
 
-  const updated = [
-    { id: flowId, name: flowName, lastOpened: new Date().toISOString() },
-    ...recent.filter(r => r.id !== flowId)
-  ].slice(0, 10);
+    const updated = [
+      { id: flowId, name: flowName, lastOpened: new Date().toISOString() },
+      ...recent.filter(r => r.id !== flowId)
+    ].slice(0, 10);
 
-  localStorage.setItem(STORAGE_KEYS.RECENT_FLOWS, JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEYS.RECENT_FLOWS, JSON.stringify(updated));
+  } catch (error) {
+    // If localStorage quota is exceeded, try to clear old data and retry
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      console.warn('localStorage quota exceeded, clearing old data...');
+      try {
+        // Clear recent flows history (keep last flow ID)
+        localStorage.removeItem(STORAGE_KEYS.RECENT_FLOWS);
+        // Retry saving just the last opened flow
+        localStorage.setItem(STORAGE_KEYS.LAST_FLOW_ID, flowId);
+      } catch (retryError) {
+        console.error('Failed to save last opened flow even after clearing:', retryError);
+        // Don't throw - this is not critical functionality
+      }
+    } else {
+      console.error('Failed to save last opened flow:', error);
+    }
+  }
 }
 
 export function getLastOpenedFlowId(): string | null {
@@ -400,12 +418,104 @@ export function clearRecentFlows(): void {
   localStorage.removeItem(STORAGE_KEYS.LAST_FLOW_ID);
 }
 
+/**
+ * Get storage usage diagnostics
+ * Helps identify storage quota issues
+ */
+export async function getStorageInfo(): Promise<{
+  indexedDB: { flowCount: number; executionCount: number };
+  localStorage: { used: number; items: number };
+  quota?: { usage: number; quota: number };
+}> {
+  const flowCount = await db.flows.count();
+  const executionCount = await db.executions.count();
+
+  // Calculate localStorage usage
+  let localStorageSize = 0;
+  let localStorageItems = 0;
+  for (let key in localStorage) {
+    if (localStorage.hasOwnProperty(key)) {
+      localStorageSize += localStorage[key].length + key.length;
+      localStorageItems++;
+    }
+  }
+
+  const info: any = {
+    indexedDB: { flowCount, executionCount },
+    localStorage: { used: localStorageSize, items: localStorageItems }
+  };
+
+  // Try to get storage quota if available
+  if ('storage' in navigator && 'estimate' in navigator.storage) {
+    try {
+      const estimate = await navigator.storage.estimate();
+      info.quota = {
+        usage: estimate.usage || 0,
+        quota: estimate.quota || 0
+      };
+    } catch (e) {
+      console.warn('Could not estimate storage quota:', e);
+    }
+  }
+
+  return info;
+}
+
 // ===== AUTOMATIC METADATA POPULATION =====
 
 /**
  * Get current device and environment information
  * Auto-populates device metadata for flows and executions
  */
+/**
+ * Custom JSON replacer to handle circular references, BigInt, and other non-serializable types
+ * Tracks seen objects and converts problematic types to safe values
+ */
+function getSerializationReplacer() {
+  const seen = new WeakSet();
+  return (_key: string, value: any) => {
+    // Handle BigInt
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+
+    // Handle functions
+    if (typeof value === 'function') {
+      return undefined;
+    }
+
+    // Handle circular references
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return '[Circular]';
+      }
+      seen.add(value);
+    }
+
+    // Handle undefined
+    if (value === undefined) {
+      return null;
+    }
+
+    return value;
+  };
+}
+
+/**
+ * Sanitize an object for IndexedDB storage
+ * Removes circular references, BigInt, functions, and other non-serializable data
+ */
+export function sanitizeForStorage(obj: any): any {
+  try {
+    // Use custom replacer to handle all non-serializable types
+    const jsonString = JSON.stringify(obj, getSerializationReplacer());
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error('Failed to sanitize object for storage:', error);
+    return null;
+  }
+}
+
 export function getCurrentDeviceInfo(): DeviceInfo {
   const userAgent = navigator.userAgent;
 
@@ -509,8 +619,15 @@ export async function createFlowWithMetadata(
     deleted: false
   };
 
-  await db.flows.add(newFlow);
-  return newFlow;
+  // Sanitize the entire flow object to remove circular references and non-serializable data
+  const sanitizedFlow = sanitizeForStorage(newFlow);
+
+  if (!sanitizedFlow) {
+    throw new Error('Failed to sanitize flow object for storage');
+  }
+
+  await db.flows.add(sanitizedFlow);
+  return sanitizedFlow;
 }
 
 /**
@@ -549,7 +666,14 @@ export async function updateFlowWithMetadata(
     versionHistory: updates.version ? versionHistory : existingFlow.versionHistory
   };
 
-  await db.flows.update(id, updatedData);
+  // Sanitize the update data to remove circular references and non-serializable objects
+  const sanitizedData = sanitizeForStorage(updatedData);
+
+  if (!sanitizedData) {
+    throw new Error('Failed to sanitize update data for storage');
+  }
+
+  await db.flows.update(id, sanitizedData);
 
   // Return the updated flow
   const updatedFlow = await db.flows.get(id);

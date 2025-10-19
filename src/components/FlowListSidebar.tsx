@@ -14,7 +14,7 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
   const [sortBy, setSortBy] = useState<'updated' | 'created' | 'name' | 'executions'>('updated');
 
   // Live query for flows from database
-  const flows = useLiveQuery(
+  const rawFlows = useLiveQuery(
     async () => {
       if (searchQuery.trim()) {
         return await searchFlows(searchQuery);
@@ -23,6 +23,17 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
     },
     [searchQuery]
   );
+
+  // Sanitize flows to ensure all fields are the correct type
+  const flows = rawFlows?.map(flow => ({
+    ...flow,
+    name: typeof flow.name === 'string' ? flow.name : 'Untitled Flow',
+    description: typeof flow.description === 'string' ? flow.description : undefined,
+    tags: Array.isArray(flow.tags) ? flow.tags.map(t => typeof t === 'string' ? t : String(t)) : [],
+    status: typeof flow.status === 'string' ? flow.status : undefined,
+    version: typeof flow.version === 'string' ? flow.version : '1.0.0',
+    updatedAt: typeof flow.updatedAt === 'string' ? flow.updatedAt : new Date().toISOString(),
+  }));
 
   // Sort flows based on selected criteria
   const sortedFlows = flows?.sort((a, b) => {
@@ -49,18 +60,26 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'Unknown';
 
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid date';
+
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   if (!isOpen) return null;
@@ -148,7 +167,7 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
                   {/* Flow Name */}
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-medium text-sm text-gray-800 truncate">
-                      {flow.name}
+                      {typeof flow.name === 'string' ? flow.name : 'Untitled Flow'}
                     </h3>
                     {flow.isFavorite && (
                       <span className="text-xs">⭐</span>
@@ -156,7 +175,7 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
                   </div>
 
                   {/* Description */}
-                  {flow.description && (
+                  {flow.description && typeof flow.description === 'string' && (
                     <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                       {flow.description}
                     </p>
@@ -165,14 +184,17 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
                   {/* Tags */}
                   {flow.tags && flow.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-2">
-                      {flow.tags.slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded"
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                      {flow.tags.slice(0, 3).map((tag, index) => {
+                        const tagText = typeof tag === 'string' ? tag : String(tag);
+                        return (
+                          <span
+                            key={tagText + index}
+                            className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded"
+                          >
+                            {tagText}
+                          </span>
+                        );
+                      })}
                       {flow.tags.length > 3 && (
                         <span className="text-xs text-gray-500">
                           +{flow.tags.length - 3}
@@ -184,7 +206,7 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
                   {/* Metadata */}
                   <div className="flex items-center gap-3 text-xs text-gray-500">
                     <span title="Node count">
-                      🔵 {flow.flow.nodes?.length || 0}
+                      🔵 {flow.flow?.nodes?.length || 0}
                     </span>
                     <span title="Execution count">
                       ▶️ {flow.executionCount || 0}
@@ -204,7 +226,7 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
                       </span>
                     )}
                     <span title="Version">
-                      v{flow.version}
+                      v{flow.version || '1.0.0'}
                     </span>
                   </div>
 
@@ -240,7 +262,7 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
               </div>
 
               {/* Status Badge */}
-              {flow.status && (
+              {flow.status && typeof flow.status === 'string' && (
                 <div className="mt-2 pt-2 border-t border-gray-200">
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full ${

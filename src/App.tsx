@@ -30,11 +30,13 @@ function AppContent() {
 
   // Flow persistence hook
   const {
+    currentFlowId,
     currentFlowName,
     autosaveStatus,
     lastSavedAt,
     isDirty,
     saveFlow,
+    loadFlow,
     newFlow,
     renameFlow,
   } = useFlowPersistence({ autosaveEnabled: true, autosaveDelayMs: 2000 });
@@ -190,7 +192,7 @@ function AppContent() {
         onHistoryClick={() => setShowHistory(!showHistory)}
         onFlowsToggle={() => setShowFlows(!showFlows)}
         onRunFlow={() => handleExecute({})}
-        onSaveFlow={saveFlow}
+        onSaveFlow={() => saveFlow()}
         onNewFlow={newFlow}
         isExecuting={isExecuting}
         historyCount={executionHistory.length}

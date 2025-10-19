@@ -93,6 +93,7 @@ const TopBar = ({
           lastSavedAt={lastSavedAt}
           flowName={flowName}
           isDirty={isDirty}
+          onFlowNameChange={onFlowNameChange}
         />
       </div>
 

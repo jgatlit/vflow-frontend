@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import type { AutosaveStatus } from '../hooks/useFlowPersistence';
 
 interface AutosaveIndicatorProps {
@@ -6,6 +6,7 @@ interface AutosaveIndicatorProps {
   lastSavedAt: string | null;
   flowName: string;
   isDirty: boolean;
+  onFlowNameChange?: (name: string) => void;
 }
 
 const AutosaveIndicator = memo(({
@@ -13,7 +14,23 @@ const AutosaveIndicator = memo(({
   lastSavedAt,
   flowName,
   isDirty,
+  onFlowNameChange,
 }: AutosaveIndicatorProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(flowName);
+
+  // Sync editName with flowName prop changes
+  useEffect(() => {
+    if (!isEditing) {
+      // Ensure flowName is always a string
+      const safeName = typeof flowName === 'string' ? flowName : 'Untitled Flow';
+      setEditName(safeName);
+    }
+  }, [flowName, isEditing]);
+
+  // Ensure flowName is always a string (defensive programming)
+  const safeFlowName = typeof flowName === 'string' ? flowName : 'Untitled Flow';
+
   const getStatusDisplay = () => {
     switch (status) {
       case 'saving':
@@ -75,11 +92,47 @@ const AutosaveIndicator = memo(({
   const statusDisplay = getStatusDisplay();
   const lastSavedDisplay = formatLastSaved();
 
+  const handleNameSave = () => {
+    if (editName.trim() && editName !== safeFlowName && onFlowNameChange) {
+      onFlowNameChange(editName.trim());
+    } else {
+      setEditName(safeFlowName);
+    }
+    setIsEditing(false);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameSave();
+    } else if (e.key === 'Escape') {
+      setEditName(safeFlowName);
+      setIsEditing(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-3 px-3 py-1.5 rounded-md border border-gray-200 bg-white shadow-sm">
       {/* Flow Name */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-700">{flowName}</span>
+        {isEditing ? (
+          <input
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onBlur={handleNameSave}
+            onKeyDown={handleNameKeyDown}
+            autoFocus
+            className="text-sm font-medium text-gray-700 bg-transparent border-b border-blue-500 focus:outline-none min-w-[120px]"
+          />
+        ) : (
+          <span
+            className="text-sm font-medium text-gray-700 cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={() => onFlowNameChange && setIsEditing(true)}
+            title="Click to rename"
+          >
+            {safeFlowName}
+          </span>
+        )}
         {isDirty && status !== 'saving' && (
           <span className="text-xs text-orange-600" title="Unsaved changes">
             *

@@ -9,6 +9,7 @@ import {
   getLastOpenedFlowId,
   type Flow
 } from '../db/database';
+import { syncFlowToBackend, isBackendSyncEnabled } from '../services/backendApi';
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -45,6 +46,35 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   const lastSavedEdgesRef = useRef<string>('');
 
   /**
+   * Sanitize React Flow object to remove non-serializable data
+   * Uses JSON serialization to strip all non-serializable properties (DOM events, functions, etc.)
+   * This is the most reliable way to ensure IndexedDB compatibility
+   */
+  const sanitizeFlowObject = (flowObject: any) => {
+    try {
+      // Use JSON.parse(JSON.stringify()) to remove all non-serializable data
+      // This automatically strips: functions, DOM nodes, Events, Symbols, undefined values
+      const serialized = JSON.stringify(flowObject);
+      const deserialized = JSON.parse(serialized);
+
+      return {
+        nodes: deserialized.nodes || [],
+        edges: deserialized.edges || [],
+        viewport: deserialized.viewport,
+      };
+    } catch (error) {
+      console.error('Failed to sanitize flow object:', error);
+
+      // Fallback: return minimal structure
+      return {
+        nodes: [],
+        edges: [],
+        viewport: flowObject.viewport || { x: 0, y: 0, zoom: 1 },
+      };
+    }
+  };
+
+  /**
    * Save current flow to database
    */
   const saveFlow = useCallback(async (flowName?: string): Promise<Flow> => {
@@ -52,6 +82,7 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
 
     try {
       const flowObject = toObject();
+      const sanitizedFlow = sanitizeFlowObject(flowObject);
       const name = flowName || state.currentFlowName;
 
       let savedFlow: Flow;
@@ -60,18 +91,31 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
         // Update existing flow
         savedFlow = await updateFlowWithMetadata(state.currentFlowId, {
           name,
-          flow: flowObject,
+          flow: sanitizedFlow,
           updatedAt: new Date().toISOString(),
         });
       } else {
         // Create new flow
-        savedFlow = await createFlowWithMetadata(name, flowObject, {
+        savedFlow = await createFlowWithMetadata(name, sanitizedFlow, {
           description: `Flow with ${nodes.length} nodes and ${edges.length} connections`,
           tags: ['auto-generated'],
         });
 
         // Store in localStorage for quick access
         localStorage.setItem('lastOpenedFlowId', savedFlow.id);
+      }
+
+      // Parallel backend sync (non-blocking)
+      if (isBackendSyncEnabled()) {
+        syncFlowToBackend(savedFlow).then(result => {
+          if (result.success) {
+            console.log('✅ Backend sync successful');
+          } else {
+            console.warn('⚠️ Backend sync failed:', result.error);
+          }
+        }).catch(error => {
+          console.error('❌ Backend sync error:', error);
+        });
       }
 
       // Update local state
@@ -160,7 +204,13 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   /**
    * Create new flow (clear current state)
    */
-  const newFlow = useCallback(() => {
+  const newFlow = useCallback(async () => {
+    // Clear canvas
+    const { useFlowStore } = await import('../store/flowStore');
+    const { setNodes, setEdges } = useFlowStore.getState();
+    setNodes([]);
+    setEdges([]);
+
     setState({
       currentFlowId: null,
       currentFlowName: 'Untitled Flow',
@@ -176,15 +226,24 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   }, []);
 
   /**
-   * Rename current flow
+   * Rename current flow and save
+   * Automatically saves the flow after renaming (creates new flow if needed)
    */
-  const renameFlow = useCallback((newName: string) => {
+  const renameFlow = useCallback(async (newName: string) => {
     setState(prev => ({
       ...prev,
       currentFlowName: newName,
       isDirty: true,
     }));
-  }, []);
+
+    // Always trigger save when renaming
+    // This will either update an existing flow or create a new one
+    try {
+      await saveFlow(newName);
+    } catch (error) {
+      console.error('Failed to save renamed flow:', error);
+    }
+  }, [state.currentFlowId, saveFlow]);
 
   /**
    * Autosave logic - debounced save on changes
