@@ -49,15 +49,15 @@ function extractCredentialReferences(nodes: Node[]): CredentialReference[] {
   const credentialMap = new Map<string, CredentialReference>();
 
   for (const node of nodes) {
-    const credId = node.data?.credentialId;
+    const credId = node.data?.credentialId as string | undefined;
     if (!credId) continue;
 
     if (!credentialMap.has(credId)) {
       // Create a reference with generic information
       credentialMap.set(credId, {
         id: credId,
-        type: node.data?.credentialType || 'api-key',
-        name: node.data?.credentialName || 'Credential',
+        type: (node.data?.credentialType as string) || 'api-key',
+        name: (node.data?.credentialName as string) || 'Credential',
         usedInNodes: [],
       });
     }

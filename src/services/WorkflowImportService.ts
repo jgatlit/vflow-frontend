@@ -9,7 +9,6 @@ import type {
   WorkflowExport,
   ImportResult,
   CredentialReference,
-  CredentialMapping,
 } from '../types/workflow-export';
 import { validateWorkflowExport, validateConnections } from '../utils/validation';
 
@@ -36,7 +35,7 @@ export async function parseWorkflowFile(file: File): Promise<WorkflowExport> {
     throw new Error(`Validation failed: ${errors}`);
   }
 
-  return validation.data!;
+  return validation.data as WorkflowExport;
 }
 
 /**
@@ -85,7 +84,7 @@ function remapCredentials(
 ): Node[] {
   return nodes.map((node) => {
     if (node.data?.credentialId) {
-      const newCredId = mappings[node.data.credentialId];
+      const newCredId = mappings[node.data.credentialId as string];
       if (newCredId) {
         return {
           ...node,

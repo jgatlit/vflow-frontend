@@ -9,6 +9,15 @@ export interface ExecutionResult {
     model?: string;
     tokensUsed?: number;
     duration?: number;
+    mode?: string;  // Execution mode (e.g., 'passthrough', 'processing')
+    runtime?: string;  // Runtime environment (e.g., 'pyodide', 'native-js')
+    originalLength?: number;  // For text processing nodes
+    processedLength?: number;  // For processed text length
+    inputCount?: number;  // Number of incoming edges
+    inputLength?: number;  // Length of input data
+    hasInput?: boolean;  // Whether node has input
+    inputNodeId?: string;  // ID of the input node (for passthrough)
+    outputVariable?: string;  // Custom output variable name
     structuredData?: any;  // Original JSON data for structured outputs
     multimodalAnalysis?: {
       mediaAccessed: boolean;

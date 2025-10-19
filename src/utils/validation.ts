@@ -122,7 +122,7 @@ export const WorkflowExportSchema = z.object({
   flow: ReactFlowJsonObjectSchema,
   credentials: z.array(CredentialReferenceSchema),
   settings: WorkflowSettingsSchema,
-  variables: z.record(VariableDefinitionSchema).optional(),
+  variables: z.record(z.string(), VariableDefinitionSchema).optional(),
 });
 
 /**
@@ -140,7 +140,7 @@ export function validateWorkflowExport(data: unknown): {
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        errors: error.errors.map((err) => ({
+        errors: error.issues.map((err) => ({
           path: err.path.join('.'),
           message: err.message,
         })),

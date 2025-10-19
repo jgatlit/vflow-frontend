@@ -265,8 +265,7 @@ async function executeNotesNode(
 
     // Substitute variables in content
     const processedContent = substituteVariables(
-    // @ts-expect-error - Legacy code with untyped node data
-      node.data.content || '',
+      (node.data as any).content || '',
       augmentedContext
     );
 
@@ -276,7 +275,7 @@ async function executeNotesNode(
       executedAt: new Date().toISOString(),
       metadata: {
         mode: 'processing',
-        originalLength: node.data.content?.length || 0,
+        originalLength: (node.data as any).content?.length || 0,
         processedLength: processedContent.length,
         inputCount: incomingEdges.length,
       },
@@ -319,9 +318,10 @@ export async function executeFlow(
       const { createExecutionWithMetadata } = await import('../db/database');
       const execution = await createExecutionWithMetadata(
         options.flowId,
-        options.flowName,
-        options.flowVersion,
-        initialVariables
+        initialVariables,
+        {
+          name: options.flowName,
+        }
       );
       executionId = execution.id;
       console.log('📝 Execution tracking started:', executionId);
@@ -351,17 +351,17 @@ export async function executeFlow(
         : await passthroughNotesNode(node, context, edges); // Forward input
     } else if (node.type === 'python') {
       result = await executePython(
-        node.data.code || '',
+        (node.data as any).code || '',
         context,
         node.id,
-        node.data.outputVariable || 'result'
+        (node.data as any).outputVariable || 'result'
       );
     } else if (node.type === 'javascript') {
       result = await executeJavaScript(
-        node.data.code || '',
+        (node.data as any).code || '',
         context,
         node.id,
-        node.data.outputVariable || 'result'
+        (node.data as any).outputVariable || 'result'
       );
     } else {
       // Execute LLM node
@@ -384,7 +384,7 @@ export async function executeFlow(
     }
 
     // Store result by custom output variable name if provided
-    const outputVarName = node.data.outputVariable || node.id;
+    const outputVarName = (node.data as any).outputVariable || node.id;
     context.variables[outputVarName] = result.output;
 
     // Also store by node ID for backward compatibility
@@ -464,8 +464,10 @@ export async function executeFlow(
       await completeExecutionWithMetadata(
         executionId,
         results,
-        hasErrors ? 'failed' : 'completed',
-        hasErrors ? 'One or more nodes failed' : undefined
+        {
+          status: hasErrors ? 'failed' : 'completed',
+          error: hasErrors ? 'One or more nodes failed' : undefined,
+        }
       );
 
       console.log('✅ Execution tracking completed:', executionId, `(${duration}ms)`);
