@@ -9,6 +9,7 @@ export interface ExecutionResult {
     model?: string;
     tokensUsed?: number;
     duration?: number;
+    structuredData?: any;  // Original JSON data for structured outputs
     multimodalAnalysis?: {
       mediaAccessed: boolean;
       mediaUrl?: string;

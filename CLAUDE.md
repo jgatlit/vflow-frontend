@@ -1,0 +1,1 @@
+- remember frontend runs exclusively through backend reverse proxy 3000

@@ -222,12 +222,6 @@ function AppContent() {
         <Controls />
         <MiniMap />
         <NodePalette />
-        <FlowListSidebar
-          isOpen={showFlows}
-          currentFlowId={currentFlowId}
-          onLoadFlow={loadFlow}
-          onNewFlow={newFlow}
-        />
         <ExecutionPanel
           isExecuting={isExecuting}
           showHistory={showHistory}
@@ -238,6 +232,13 @@ function AppContent() {
           onSetCurrentExecution={setCurrentExecution}
         />
       </ReactFlow>
+      <FlowListSidebar
+        isOpen={showFlows}
+        currentFlowId={currentFlowId}
+        onLoadFlow={loadFlow}
+        onNewFlow={newFlow}
+        onClose={() => setShowFlows(false)}
+      />
     </div>
   );
 }

@@ -9,9 +9,11 @@ export interface NotesNodeData {
   title: string;
   varMode?: boolean;      // true = process variables, false = passthrough
   minimized?: boolean;    // collapse to minimal view
+  outputVariable?: string;
 }
 
-const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
+const NotesNode = memo(({ id, data, selected }: NodeProps) => {
+  const nodeData = data as unknown as NotesNodeData;
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
 
   const handleDataChange = (field: keyof NotesNodeData, value: string | boolean) => {
@@ -26,7 +28,7 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
     purple: { bg: 'bg-purple-100', border: 'border-purple-400', text: 'text-purple-800' },
   };
 
-  const currentColor = colors[data.color as keyof typeof colors] || colors.yellow;
+  const currentColor = colors[nodeData.color as keyof typeof colors] || colors.yellow;
 
   return (
     <>
@@ -36,13 +38,13 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
         isVisible={selected}
       />
       <div className={`${currentColor.bg} rounded-lg shadow-lg border-2 ${currentColor.border} p-4 ${
-        data.varMode ? 'ring-2 ring-purple-300' : ''
+        nodeData.varMode ? 'ring-2 ring-purple-300' : ''
       }`}>
         {/* Header */}
         <div className="mb-3">
           <input
             type="text"
-            value={data.title || 'Notes'}
+            value={nodeData.title || 'Notes'}
             onChange={(e) => handleDataChange('title', e.target.value)}
             className={`font-semibold text-lg ${currentColor.text} bg-transparent border-none outline-none w-full mb-1`}
             placeholder="Note Title..."
@@ -56,7 +58,7 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
             <input
               type="checkbox"
               id={`var-mode-${id}`}
-              checked={data.varMode || false}
+              checked={nodeData.varMode || false}
               onChange={(e) => handleDataChange('varMode', e.target.checked)}
               className="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
             />
@@ -70,7 +72,7 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
 
           {/* Mode Indicator */}
           <div className="text-xs">
-            {data.varMode ? (
+            {nodeData.varMode ? (
               <div className="bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-200">
                 📝 <strong>Transform Mode:</strong> Processes {'{{'} variables {'}}'} in content. Output = processed markdown.
               </div>
@@ -89,7 +91,7 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
               key={colorName}
               onClick={() => handleDataChange('color', colorName)}
               className={`w-6 h-6 rounded-full ${colorClass.bg} border-2 ${
-                data.color === colorName ? colorClass.border : 'border-transparent'
+                nodeData.color === colorName ? colorClass.border : 'border-transparent'
               } hover:scale-110 transition-transform`}
               title={colorName}
             />
@@ -99,11 +101,11 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
         {/* Content */}
         <div>
           <textarea
-            value={data.content || ''}
+            value={nodeData.content || ''}
             onChange={(e) => handleDataChange('content', e.target.value)}
             className={`w-full min-h-[120px] ${currentColor.bg} ${currentColor.text} border-none outline-none resize-y font-mono text-sm`}
             placeholder={
-              data.varMode
+              nodeData.varMode
                 ? "Add template with variables...&#10;&#10;Use {{1}}, {{2}} for inputs&#10;Use {{nodeId}} for specific nodes&#10;&#10;Example:&#10;# Result&#10;Input: {{1}}&#10;Output: Processed..."
                 : "Add your notes here...&#10;&#10;Supports markdown:&#10;- **bold**&#10;- *italic*&#10;- # Heading&#10;- - List item&#10;&#10;Enable 'Process Variables' to use {{var}} syntax"
             }
@@ -111,11 +113,37 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
         </div>
 
         {/* Footer */}
-        <div className={`text-xs ${currentColor.text} opacity-70 mt-2`}>
-          {data.varMode ? (
-            <span>⚡ Variables processed during execution • Reference output: <code className="bg-white/50 px-1 rounded">{`{{${id}}}`}</code></span>
+        <div className={`text-xs ${currentColor.text} mt-2 flex items-center gap-1 flex-wrap`}>
+          {nodeData.varMode ? (
+            <>
+              <span>⚡ Variables processed • Reference using</span>
+              <span className="font-mono">{'{{'}</span>
+              <input
+                type="text"
+                value={nodeData.outputVariable || id}
+                onChange={(e) => handleDataChange('outputVariable', e.target.value)}
+                className="bg-white/70 px-1 py-0.5 rounded font-mono border border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-400 hover:border-purple-400 transition-colors min-w-[4ch]"
+                placeholder={id}
+                title="Click to edit output variable name"
+                style={{ width: `${Math.max(4, (nodeData.outputVariable || id).length)}ch` }}
+              />
+              <span className="font-mono">{'}}'}</span>
+            </>
           ) : (
-            <span>🔄 Input passes through unchanged • <code className="bg-white/50 px-1 rounded">{`{{${id}}}`}</code> = forwarded input</span>
+            <>
+              <span>🔄 Passthrough • Reference using</span>
+              <span className="font-mono">{'{{'}</span>
+              <input
+                type="text"
+                value={nodeData.outputVariable || id}
+                onChange={(e) => handleDataChange('outputVariable', e.target.value)}
+                className="bg-white/70 px-1 py-0.5 rounded font-mono border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 hover:border-blue-400 transition-colors min-w-[4ch]"
+                placeholder={id}
+                title="Click to edit output variable name"
+                style={{ width: `${Math.max(4, (nodeData.outputVariable || id).length)}ch` }}
+              />
+              <span className="font-mono">{'}}'}</span>
+            </>
           )}
         </div>
       </div>
@@ -125,7 +153,7 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
         type="target"
         position={Position.Top}
         className={`!w-4 !h-4 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all ${
-          data.varMode ? '!bg-purple-500' : '!bg-blue-500'
+          nodeData.varMode ? '!bg-purple-500' : '!bg-blue-500'
         }`}
         style={{ zIndex: 10 }}
       />
@@ -133,7 +161,7 @@ const NotesNode = memo(({ id, data, selected }: NodeProps<NotesNodeData>) => {
         type="source"
         position={Position.Bottom}
         className={`!w-4 !h-4 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all ${
-          data.varMode ? '!bg-purple-500' : '!bg-blue-500'
+          nodeData.varMode ? '!bg-purple-500' : '!bg-blue-500'
         }`}
         style={{ zIndex: 10 }}
       />

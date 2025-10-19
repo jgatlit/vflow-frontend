@@ -230,12 +230,15 @@ export async function searchFlows(query: string): Promise<Flow[]> {
   const lowerQuery = query.toLowerCase();
 
   return await db.flows
-    .filter(flow =>
-      (flow.deleted === false || flow.deleted === undefined) &&
-      (flow.name.toLowerCase().includes(lowerQuery) ||
-       flow.description?.toLowerCase().includes(lowerQuery) ||
-       flow.tags?.some(tag => tag.toLowerCase().includes(lowerQuery)))
-    )
+    .filter(flow => {
+      const isDeleted = flow.deleted === true;
+      const matchesQuery = Boolean(
+        flow.name.toLowerCase().includes(lowerQuery) ||
+        flow.description?.toLowerCase().includes(lowerQuery) ||
+        flow.tags?.some(tag => tag.toLowerCase().includes(lowerQuery))
+      );
+      return !isDeleted && matchesQuery;
+    })
     .toArray();
 }
 

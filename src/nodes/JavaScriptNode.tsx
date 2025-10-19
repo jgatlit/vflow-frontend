@@ -10,7 +10,8 @@ interface JavaScriptNodeData {
   outputVariable?: string;
 }
 
-function JavaScriptNode({ id, data, selected }: NodeProps<JavaScriptNodeData>) {
+function JavaScriptNode({ id, data, selected }: NodeProps) {
+  const nodeData = data as unknown as JavaScriptNodeData;
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
 
   const handleDataChange = (key: keyof JavaScriptNodeData, value: any) => {
@@ -42,7 +43,7 @@ function JavaScriptNode({ id, data, selected }: NodeProps<JavaScriptNodeData>) {
               <span className="text-xl">⚡</span>
               <input
                 type="text"
-                value={data.title || 'JavaScript Code'}
+                value={nodeData.title || 'JavaScript Code'}
                 onChange={(e) => handleDataChange('title', e.target.value)}
                 className="font-semibold text-lg flex-1 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-yellow-300 rounded px-1"
                 placeholder="Node Title"
@@ -56,20 +57,20 @@ function JavaScriptNode({ id, data, selected }: NodeProps<JavaScriptNodeData>) {
         </div>
 
         {/* Output Variable */}
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Output Variable Name
-          </label>
+        <div className="mt-3 p-2 bg-yellow-50 rounded text-xs text-gray-600 flex items-center gap-1 mb-3">
+          <span className="font-semibold">💡 Output:</span>
+          <span>Reference using</span>
+          <span className="font-mono text-yellow-700">{'{{'}</span>
           <input
             type="text"
-            value={data.outputVariable || ''}
+            value={nodeData.outputVariable || id}
             onChange={(e) => handleDataChange('outputVariable', e.target.value)}
-            placeholder="result"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+            className="bg-white px-1 py-0.5 rounded font-mono text-yellow-700 border border-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 hover:border-yellow-300 transition-colors min-w-[4ch]"
+            placeholder={id}
+            title="Click to edit output variable name"
+            style={{ width: `${Math.max(4, (nodeData.outputVariable || id).length)}ch` }}
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Access this output in other nodes using: {'{'}{'{'}{data.outputVariable || 'result'}{'}'}{'}'}
-          </p>
+          <span className="font-mono text-yellow-700">{'}}'}</span>
         </div>
 
         {/* Code Editor */}
@@ -78,7 +79,7 @@ function JavaScriptNode({ id, data, selected }: NodeProps<JavaScriptNodeData>) {
             JavaScript Code
           </label>
           <textarea
-            value={data.code || ''}
+            value={nodeData.code || ''}
             onChange={(e) => handleDataChange('code', e.target.value)}
             placeholder={`// Access input variables from context\n// Example: const x = context.input_value;\n\n// Your code here\nconst result = "Hello from JavaScript!";\n\n// Return value will be stored in output variable\nreturn result;`}
             className="w-full h-64 px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none"

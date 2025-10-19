@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Rnd } from 'react-rnd';
 import ReactMarkdown from 'react-markdown';
 import { useFlowStore } from '../store/flowStore';
-import { executeFlow } from '../services/executionService';
 import type { ExecutionResult } from '../utils/executionEngine';
 
 export interface ExecutionHistory {
@@ -23,7 +22,6 @@ interface ExecutionPanelProps {
 }
 
 const ExecutionPanel = ({
-  isExecuting,
   showHistory,
   onExecute,
   onToggleHistory,
@@ -70,11 +68,6 @@ const ExecutionPanel = ({
   };
 
   const nodes = useFlowStore((state) => state.nodes);
-  const edges = useFlowStore((state) => state.edges);
-
-  const handleExecuteWithInput = () => {
-    setShowInputDialog(true);
-  };
 
   return (
     <>
@@ -140,8 +133,8 @@ const ExecutionPanel = ({
         <Rnd
           position={panelPosition}
           size={panelSize}
-          onDragStop={(e, d) => setPanelPosition({ x: d.x, y: d.y })}
-          onResizeStop={(e, direction, ref, delta, position) => {
+          onDragStop={(_e, d) => setPanelPosition({ x: d.x, y: d.y })}
+          onResizeStop={(_e, _direction, ref, _delta, position) => {
             setPanelSize({
               width: parseInt(ref.style.width),
               height: parseInt(ref.style.height)

@@ -1,73 +1,108 @@
-# React + TypeScript + Vite
+# Prompt Flow Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Visual workflow builder for creating complex LLM automation flows with drag-and-drop interface.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This frontend is served through a **reverse proxy** on the backend server. The application runs on **http://localhost:3000** (not port 5173).
 
-## React Compiler
+### Reverse Proxy Setup
+- Backend server (Express) runs on port 3000
+- Frontend dev server (Vite) runs internally on port 5173
+- All requests to `http://localhost:3000` are proxied to the frontend
+- API requests to `http://localhost:3000/api/*` are handled by the backend
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Development
 
-## Expanding the ESLint configuration
+### Prerequisites
+- Node.js 18+
+- Backend server must be running (see `../prompt-flow-backend`)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Start Development Server
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+```bash
+# Install dependencies
+npm install
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Start frontend dev server (runs on port 5173 internally)
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+**Access the application at: http://localhost:3000** (via backend reverse proxy)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Build for Production
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
 ```
+
+The production build is served statically by the backend server.
+
+## Technology Stack
+
+- **React 18** - UI framework
+- **TypeScript 5** - Type safety
+- **Vite 7** - Build tool and dev server
+- **React Flow** - Visual workflow canvas
+- **Tailwind CSS** - Styling
+- **Zustand** - State management
+- **Dexie.js** - Client-side IndexedDB storage
+
+## Features
+
+### LLM Node Support
+- **OpenAI**: GPT-4o, o3, o4-mini with structured output
+- **Anthropic**: Claude 4.5 Sonnet, Haiku, Opus with extended thinking
+- **Google Gemini**: 2.0 Flash, 1.5 Pro/Flash with multimodal support
+
+### Structured Output
+- JSON output with schema validation
+- CSV output with automatic conversion
+- Auto-conversion between JSON ↔ CSV formats
+- Field-level variable extraction (e.g., `{{node.field}}`)
+
+### Node Types
+- **LLM Nodes**: OpenAI, Anthropic, Gemini
+- **Notes Nodes**: Variable substitution and passthrough modes
+- **Code Nodes**: Python and JavaScript execution
+- **Input/Output**: Manual variable entry and results display
+
+### Visual Features
+- Drag-and-drop workflow builder
+- Real-time execution with streaming
+- Compact/expanded node views
+- Custom output variable names
+- Variable reference highlighting
+
+## Project Structure
+
+```
+src/
+├── components/     # Reusable UI components
+├── nodes/          # React Flow node components
+├── pages/          # Main application pages
+├── services/       # API and execution services
+├── store/          # Zustand state management
+├── db/             # IndexedDB database layer
+├── utils/          # Utility functions
+└── config/         # Configuration files
+```
+
+## Configuration
+
+Environment variables (optional):
+- `VITE_API_URL` - Backend API URL (default: http://localhost:3000)
+
+## Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+## Notes
+
+- The frontend communicates with the backend via REST API at `/api/*`
+- All authentication and API keys are handled server-side
+- Flows are saved to IndexedDB locally and optionally synced to PostgreSQL backend
+- The dev server uses HMR (Hot Module Replacement) for fast development

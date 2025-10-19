@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { db, type Flow, getAllFlows, searchFlows } from '../db/database';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { db, getAllFlows, searchFlows } from '../db/database';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 interface FlowListSidebarProps {
@@ -7,9 +8,10 @@ interface FlowListSidebarProps {
   currentFlowId: string | null;
   onLoadFlow: (flowId: string) => void;
   onNewFlow: () => void;
+  onClose: () => void;
 }
 
-const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowListSidebarProps) => {
+const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow, onClose }: FlowListSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'updated' | 'created' | 'name' | 'executions'>('updated');
 
@@ -84,8 +86,40 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
 
   if (!isOpen) return null;
 
-  return (
-    <div className="absolute top-12 left-4 z-10 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClose();
+  };
+
+  const handleModalClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  const modalContent = (
+    <>
+      {/* Backdrop overlay */}
+      <div
+        data-testid="flow-list-backdrop"
+        className="fixed inset-0"
+        onClick={handleBackdropClick}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+          zIndex: 9999,
+          cursor: 'pointer'
+        }}
+      />
+
+      {/* Modal content */}
+      <div
+        className="fixed top-12 left-4 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-[calc(100vh-80px)] overflow-hidden flex flex-col"
+        onClick={handleModalClick}
+        style={{ zIndex: 10000 }}
+      >
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">
@@ -152,7 +186,7 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
             )}
           </div>
         ) : (
-          sortedFlows.map((flow) => (
+          sortedFlows?.map((flow) => (
             <div
               key={flow.id}
               className={`p-3 rounded-lg border transition-all cursor-pointer ${
@@ -284,7 +318,10 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow }: FlowL
         )}
       </div>
     </div>
+    </>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default FlowListSidebar;

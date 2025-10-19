@@ -5,7 +5,6 @@ import {
   db,
   createFlowWithMetadata,
   updateFlowWithMetadata,
-  accessFlow,
   getLastOpenedFlowId,
   type Flow
 } from '../db/database';

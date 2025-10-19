@@ -56,6 +56,9 @@ export async function executeNode(request: NodeExecutionRequest): Promise<Execut
         extendedThinking: request.data.extendedThinking,
         thinkingBudget: request.data.thinkingBudget,
         multimodal: request.data.multimodal, // Enable Google SDK for images, videos, PDFs
+        outputFormat: request.data.outputFormat,
+        jsonSchema: request.data.jsonSchema,
+        csvFields: request.data.csvFields,
       }),
     });
 
@@ -75,6 +78,7 @@ export async function executeNode(request: NodeExecutionRequest): Promise<Execut
         model: data.result.model,
         tokensUsed: data.result.usage?.totalTokens,
         duration,
+        structuredData: data.result.structuredData,  // Include structured data
       },
     };
   } catch (error: any) {
@@ -261,6 +265,7 @@ async function executeNotesNode(
 
     // Substitute variables in content
     const processedContent = substituteVariables(
+    // @ts-expect-error - Legacy code with untyped node data
       node.data.content || '',
       augmentedContext
     );
@@ -378,9 +383,62 @@ export async function executeFlow(
       console.log(`✅ Node ${node.id} completed - Output length: ${result.output.length} chars`);
     }
 
-    // Store result by output variable name for code nodes
-    if ((node.type === 'python' || node.type === 'javascript') && node.data.outputVariable) {
-      context.variables[node.data.outputVariable] = result.output;
+    // Store result by custom output variable name if provided
+    const outputVarName = node.data.outputVariable || node.id;
+    context.variables[outputVarName] = result.output;
+
+    // Also store by node ID for backward compatibility
+    if (node.data.outputVariable && node.data.outputVariable !== node.id) {
+      context.variables[node.id] = result.output;
+    }
+
+    // For structured output (JSON or CSV), extract individual fields as separate variables
+    // Use metadata.structuredData if available (for CSV) or parse JSON output
+    if ((node.data.outputFormat === 'json' || node.data.outputFormat === 'csv') && !result.error) {
+      try {
+        let jsonData: any = null;
+
+        // First, try to use structured data from metadata (for CSV outputs)
+        if (result.metadata?.structuredData) {
+          jsonData = result.metadata.structuredData;
+          console.log(`  📊 Using structured data from metadata`);
+        }
+        // Otherwise, parse JSON output directly
+        else if (node.data.outputFormat === 'json' && result.output) {
+          // Strip markdown code blocks if present
+          let jsonString = result.output.trim();
+          jsonString = jsonString.replace(/^```json\s*/gm, '').replace(/^```\s*/gm, '').trim();
+          jsonData = JSON.parse(jsonString);
+        }
+
+        if (jsonData) {
+          // If it's an object, store each field as nodeId.fieldName
+          if (typeof jsonData === 'object' && !Array.isArray(jsonData)) {
+            Object.keys(jsonData).forEach(key => {
+              const varName = `${outputVarName}.${key}`;
+              context.variables[varName] = String(jsonData[key]);
+              console.log(`  📊 Created variable: {{${varName}}} = ${String(jsonData[key]).substring(0, 50)}${String(jsonData[key]).length > 50 ? '...' : ''}`);
+            });
+          }
+          // If it's an array, store with indexes
+          else if (Array.isArray(jsonData)) {
+            jsonData.forEach((item, index) => {
+              if (typeof item === 'object') {
+                Object.keys(item).forEach(key => {
+                  const varName = `${outputVarName}[${index}].${key}`;
+                  context.variables[varName] = String(item[key]);
+                });
+              } else {
+                const varName = `${outputVarName}[${index}]`;
+                context.variables[varName] = String(item);
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to parse structured output for variable extraction:`, error);
+        // Continue execution - the full output is still stored
+      }
     }
 
     // If there was an error, stop execution
