@@ -226,24 +226,81 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   }, []);
 
   /**
-   * Rename current flow and save
-   * Automatically saves the flow after renaming (creates new flow if needed)
+   * Save as new flow with a different name
+   * Creates a brand new flow instead of updating the existing one
+   * This allows users to create variants/copies by changing the name
    */
-  const renameFlow = useCallback(async (newName: string) => {
+  const saveAsNewFlow = useCallback(async (newName: string) => {
     setState(prev => ({
       ...prev,
       currentFlowName: newName,
       isDirty: true,
     }));
 
-    // Always trigger save when renaming
-    // This will either update an existing flow or create a new one
     try {
-      await saveFlow(newName);
+      const flowObject = toObject();
+      const sanitizedFlow = sanitizeFlowObject(flowObject);
+
+      // Always create a NEW flow (ignore currentFlowId)
+      const savedFlow = await createFlowWithMetadata(newName, sanitizedFlow, {
+        description: `Flow with ${nodes.length} nodes and ${edges.length} connections`,
+        tags: ['auto-generated'],
+      });
+
+      // Store in localStorage for quick access
+      localStorage.setItem('lastOpenedFlowId', savedFlow.id);
+
+      // Parallel backend sync (non-blocking)
+      if (isBackendSyncEnabled()) {
+        syncFlowToBackend(savedFlow).then(result => {
+          if (result.success) {
+            console.log('✅ Backend sync successful');
+          } else {
+            console.warn('⚠️ Backend sync failed:', result.error);
+          }
+        }).catch(error => {
+          console.error('❌ Backend sync error:', error);
+        });
+      }
+
+      // Update local state
+      setState(prev => ({
+        ...prev,
+        currentFlowId: savedFlow.id,
+        currentFlowName: savedFlow.name,
+        autosaveStatus: 'saved',
+        lastSavedAt: savedFlow.updatedAt,
+        isDirty: false,
+      }));
+
+      // Update refs to track saved state
+      lastSavedNodesRef.current = JSON.stringify(nodes);
+      lastSavedEdgesRef.current = JSON.stringify(edges);
+
+      // Reset to idle after 2 seconds
+      setTimeout(() => {
+        setState(prev => ({ ...prev, autosaveStatus: 'idle' }));
+      }, 2000);
+
+      return savedFlow;
     } catch (error) {
-      console.error('Failed to save renamed flow:', error);
+      console.error('Failed to save as new flow:', error);
+      setState(prev => ({ ...prev, autosaveStatus: 'error' }));
+
+      // Reset to idle after 3 seconds
+      setTimeout(() => {
+        setState(prev => ({ ...prev, autosaveStatus: 'idle' }));
+      }, 3000);
+
+      throw error;
     }
-  }, [state.currentFlowId, saveFlow]);
+  }, [toObject, nodes, edges]);
+
+  /**
+   * Rename current flow and save (DEPRECATED - Use saveAsNewFlow instead)
+   * Kept for backward compatibility
+   */
+  const renameFlow = saveAsNewFlow;
 
   /**
    * Autosave logic - debounced save on changes

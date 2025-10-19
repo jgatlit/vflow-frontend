@@ -1,12 +1,35 @@
 import type { Flow } from '../db/database';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+// Empty string = relative URLs (same origin for production)
+// Development should set VITE_BACKEND_URL=http://localhost:3000 for separate servers
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 const RETRY_DELAYS = [1000, 2000, 5000]; // 1s, 2s, 5s
 
 interface BackendResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+/**
+ * Generate or retrieve a stable device/client identifier
+ * This allows the frontend to work without requiring user authentication
+ * while still providing a consistent identifier for flow ownership
+ */
+function getDeviceId(): string {
+  const STORAGE_KEY = 'visual-flow-device-id';
+
+  let deviceId = localStorage.getItem(STORAGE_KEY);
+
+  if (!deviceId) {
+    // Generate a stable device ID using crypto.randomUUID()
+    // Format: device-{uuid} to distinguish from real user IDs
+    deviceId = `device-${crypto.randomUUID()}`;
+    localStorage.setItem(STORAGE_KEY, deviceId);
+    console.log('Generated new device ID:', deviceId);
+  }
+
+  return deviceId;
 }
 
 /**
@@ -24,12 +47,15 @@ export async function syncFlowToBackend(flow: Flow): Promise<BackendResponse<Flo
   // Try to sync with retry logic
   for (let i = 0; i < RETRY_DELAYS.length; i++) {
     try {
+      // Get stable device identifier
+      const deviceId = getDeviceId();
+
       // Try UPDATE first (PUT)
       let response = await fetch(`${BACKEND_URL}/api/flows/${flow.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': 'user-1' // TODO: Replace with actual user ID from auth
+          'x-user-id': deviceId
         },
         body: JSON.stringify(flow),
         signal: AbortSignal.timeout(5000) // 5s timeout
@@ -42,7 +68,7 @@ export async function syncFlowToBackend(flow: Flow): Promise<BackendResponse<Flo
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': 'user-1' // TODO: Replace with actual user ID from auth
+            'x-user-id': deviceId
           },
           body: JSON.stringify(flow),
           signal: AbortSignal.timeout(5000)
