@@ -161,7 +161,22 @@ export async function exportWorkflowViaAPI(
 }
 
 /**
+ * Format date for export filename
+ * Format: mmmdd-hh:mm (e.g., "oct19-14:23")
+ */
+function formatExportDate(date: Date = new Date()): string {
+  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const month = months[date.getMonth()];
+  const day = date.getDate().toString().padStart(2, '0');
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+
+  return `${month}${day}-${hours}:${minutes}`;
+}
+
+/**
  * Download workflow as .vflow file
+ * Enhanced filename format: {flow-name}-{mmmdd-hh:mm}.vflow
  */
 export function downloadWorkflowFile(
   workflow: WorkflowExport,
@@ -177,7 +192,8 @@ export function downloadWorkflowFile(
   const sanitizedName = workflow.meta.name
     .replace(/[^a-zA-Z0-9-_]/g, '-')
     .toLowerCase();
-  const defaultFilename = `${sanitizedName}-${Date.now()}.vflow`;
+  const dateStamp = formatExportDate();
+  const defaultFilename = `${sanitizedName}-${dateStamp}.vflow`;
 
   link.download = filename || defaultFilename;
   document.body.appendChild(link);

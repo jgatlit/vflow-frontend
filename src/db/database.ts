@@ -416,6 +416,27 @@ export function getRecentFlows(): RecentFlow[] {
   return JSON.parse(localStorage.getItem(STORAGE_KEYS.RECENT_FLOWS) || '[]');
 }
 
+/**
+ * Option 2: Enhanced Restore Logic
+ * Get the most recently accessed flow from IndexedDB
+ * This provides more reliable restoration than localStorage
+ */
+export async function getMostRecentlyAccessedFlow(): Promise<Flow | null> {
+  try {
+    // Query flows sorted by lastAccessedAt descending, get first result
+    const recentFlow = await db.flows
+      .where('deleted').equals(0) // Exclude deleted flows
+      .and(flow => !!flow.lastAccessedAt) // Only flows that have been accessed
+      .reverse() // Most recent first
+      .sortBy('lastAccessedAt');
+
+    return recentFlow[0] || null;
+  } catch (error) {
+    console.error('Failed to get most recently accessed flow:', error);
+    return null;
+  }
+}
+
 export function clearRecentFlows(): void {
   localStorage.removeItem(STORAGE_KEYS.RECENT_FLOWS);
   localStorage.removeItem(STORAGE_KEYS.LAST_FLOW_ID);

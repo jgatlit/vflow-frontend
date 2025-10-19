@@ -8,6 +8,7 @@ import NodePalette from './components/NodePalette';
 import TopBar from './components/TopBar';
 import FlowListSidebar from './components/FlowListSidebar';
 import ExecutionPanel, { type ExecutionHistory } from './components/ExecutionPanel';
+import VersionDisplay from './components/VersionDisplay';
 import { executeFlow } from './services/executionService';
 import type { ExecutionResult } from './utils/executionEngine';
 import { useFlowStore } from './store/flowStore';
@@ -217,11 +218,13 @@ function AppContent() {
         deleteKeyCode={['Backspace', 'Delete']}
         selectionKeyCode={null}
         multiSelectionKeyCode="Shift"
+        proOptions={{ hideAttribution: true }}
       >
         <Background />
-        <Controls />
+        <Controls showInteractive={false} />
         <MiniMap />
         <NodePalette />
+        <VersionDisplay />
         <ExecutionPanel
           isExecuting={isExecuting}
           showHistory={showHistory}

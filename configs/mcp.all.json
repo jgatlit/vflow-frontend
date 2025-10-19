@@ -8,9 +8,10 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-railway"]
     },
-    "playwright": {
+    "browser-automation": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-playwright"]
+      "args": ["-y", "@playwright/mcp@latest"],
+      "description": "Official Playwright browser automation - Cross-browser testing, screenshots, and web automation"
     },
     "github": {
       "command": "npx",

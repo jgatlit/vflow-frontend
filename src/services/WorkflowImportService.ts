@@ -16,6 +16,42 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const SUPPORTED_VERSIONS = ['v1'];
 
 /**
+ * Parse filename to flow name
+ * Converts filename to a clean, human-readable flow name
+ * Examples:
+ *   "my-workflow-1234567890.vflow" -> "My Workflow"
+ *   "product_analyzer.vflow" -> "Product Analyzer"
+ *   "data-flow-oct19.vflow" -> "Data Flow Oct19"
+ */
+export function parseFilenameToFlowName(filename: string): string {
+  // Remove file extension
+  const nameWithoutExt = filename.replace(/\.vflow$/i, '');
+
+  // Remove timestamp patterns (13-digit unix timestamp)
+  const nameWithoutTimestamp = nameWithoutExt.replace(/-\d{13}$/, '');
+
+  // Replace hyphens, underscores, and multiple spaces with single space
+  const spacedName = nameWithoutTimestamp
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Capitalize first letter of each word
+  const capitalizedName = spacedName
+    .split(' ')
+    .map(word => {
+      if (word.length === 0) return word;
+      // Keep all-caps acronyms (e.g., API, URL)
+      if (word === word.toUpperCase() && word.length <= 4) return word;
+      // Capitalize first letter, lowercase rest
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+
+  return capitalizedName || 'Untitled Flow';
+}
+
+/**
  * Parse and validate imported file
  */
 export async function parseWorkflowFile(file: File): Promise<WorkflowExport> {
@@ -35,7 +71,20 @@ export async function parseWorkflowFile(file: File): Promise<WorkflowExport> {
     throw new Error(`Validation failed: ${errors}`);
   }
 
-  return validation.data as WorkflowExport;
+  const workflow = validation.data as WorkflowExport;
+
+  // Enhancement: Update flow name based on filename if metadata name is generic
+  const parsedName = parseFilenameToFlowName(file.name);
+  const genericNames = ['untitled', 'workflow', 'my workflow', 'new workflow'];
+
+  if (
+    !workflow.meta.name ||
+    genericNames.includes(workflow.meta.name.toLowerCase())
+  ) {
+    workflow.meta.name = parsedName;
+  }
+
+  return workflow;
 }
 
 /**

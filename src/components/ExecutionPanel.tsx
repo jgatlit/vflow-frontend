@@ -4,6 +4,50 @@ import ReactMarkdown from 'react-markdown';
 import { useFlowStore } from '../store/flowStore';
 import type { ExecutionResult } from '../utils/executionEngine';
 
+/**
+ * Get default color for node type
+ */
+function getNodeTypeColor(nodeType?: string): string {
+  const typeColors: Record<string, string> = {
+    anthropic: '#4A90E2',
+    openai: '#10A37F',
+    gemini: '#4285F4',
+    notes: '#FFD700',
+    output: '#9B59B6',
+    variable: '#E67E22',
+    condition: '#1ABC9C',
+    loop: '#E74C3C',
+  };
+
+  return typeColors[nodeType?.toLowerCase() || ''] || '#95A5A6';
+}
+
+/**
+ * Calculate contrast color (white or black) for given background
+ */
+function getContrastColor(backgroundColor: string): string {
+  // Convert color to RGB
+  let r = 0, g = 0, b = 0;
+
+  if (backgroundColor.startsWith('#')) {
+    const hex = backgroundColor.slice(1);
+    r = parseInt(hex.substr(0, 2), 16);
+    g = parseInt(hex.substr(2, 2), 16);
+    b = parseInt(hex.substr(4, 2), 16);
+  } else if (backgroundColor.startsWith('rgb')) {
+    const match = backgroundColor.match(/\d+/g);
+    if (match) {
+      [r, g, b] = match.map(Number);
+    }
+  }
+
+  // Calculate relative luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Return white for dark backgrounds, black for light backgrounds
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
+
 export interface ExecutionHistory {
   id: string;
   timestamp: string;
@@ -32,6 +76,7 @@ const ExecutionPanel = ({
   const [inputVariables, setInputVariables] = useState<Record<string, string>>({});
   const [showInputDialog, setShowInputDialog] = useState(false);
   const [resultsViewMode, setResultsViewMode] = useState<'markdown' | 'raw'>('markdown');
+  const [copyAllSuccess, setCopyAllSuccess] = useState(false);
 
   // Panel position and size state with localStorage persistence
   const [panelPosition, setPanelPosition] = useState(() => {
@@ -68,6 +113,46 @@ const ExecutionPanel = ({
   };
 
   const nodes = useFlowStore((state) => state.nodes);
+
+  /**
+   * Copy all execution results to clipboard in markdown format
+   */
+  const copyAllToClipboard = () => {
+    if (!currentExecution) return;
+
+    let markdown = '# Execution Results\n\n';
+
+    Array.from(currentExecution.entries()).forEach(([nodeId, result]) => {
+      const node = nodes.find(n => n.id === nodeId);
+      const nodeLabel = node?.data?.label || nodeId;
+      const nodeType = node?.type?.toUpperCase() || 'UNKNOWN';
+
+      markdown += `## ${nodeLabel} ${nodeType}\n\n`;
+
+      if (result.error) {
+        markdown += `**Error:** ${result.error}\n\n`;
+      } else {
+        markdown += `${result.output}\n\n`;
+      }
+
+      markdown += `---\n`;
+      markdown += `Executed: ${result.executedAt}\n`;
+      if (result.metadata?.tokensUsed) {
+        markdown += `Tokens: ${result.metadata.tokensUsed}\n`;
+      }
+      if (result.metadata?.duration) {
+        markdown += `Duration: ${result.metadata.duration}ms\n`;
+      }
+      markdown += `\n`;
+    });
+
+    navigator.clipboard.writeText(markdown).then(() => {
+      setCopyAllSuccess(true);
+      setTimeout(() => setCopyAllSuccess(false), 2000);
+    }).catch(err => {
+      console.error('Failed to copy to clipboard:', err);
+    });
+  };
 
   return (
     <>
@@ -157,6 +242,17 @@ const ExecutionPanel = ({
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={copyAllToClipboard}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    copyAllSuccess
+                      ? 'bg-green-100 border-green-300 text-green-700'
+                      : 'bg-white hover:bg-gray-100 border-gray-300'
+                  }`}
+                  title="Copy all results to clipboard"
+                >
+                  {copyAllSuccess ? '✓ Copied!' : '📋 Copy All'}
+                </button>
+                <button
                   onClick={() => setResultsViewMode(mode => mode === 'raw' ? 'markdown' : 'raw')}
                   className="text-xs px-2 py-1 bg-white hover:bg-gray-100 rounded border border-gray-300"
                   title={resultsViewMode === 'raw' ? 'View as markdown' : 'View raw text'}
@@ -201,12 +297,23 @@ const ExecutionPanel = ({
                 URL.revokeObjectURL(url);
               };
 
+              // Get node label and color
+              const nodeLabel = node?.data?.label || nodeId;
+              const nodeType = node?.type?.toUpperCase() || 'UNKNOWN';
+              const nodeColor = node?.style?.backgroundColor || getNodeTypeColor(node?.type);
+
               return (
                 <div key={nodeId} className={`p-3 rounded-lg border ${result.error ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">
-                        {node?.type?.toUpperCase()} Node
+                      <span
+                        className="font-medium text-sm px-2 py-1 rounded"
+                        style={{
+                          backgroundColor: nodeColor,
+                          color: getContrastColor(nodeColor)
+                        }}
+                      >
+                        {nodeLabel} {nodeType}
                       </span>
                       {result.metadata?.multimodalAnalysis?.mediaAccessed && (
                         <span

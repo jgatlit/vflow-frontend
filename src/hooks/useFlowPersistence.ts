@@ -6,6 +6,7 @@ import {
   createFlowWithMetadata,
   updateFlowWithMetadata,
   getLastOpenedFlowId,
+  getMostRecentlyAccessedFlow,
   type Flow
 } from '../db/database';
 import { syncFlowToBackend, isBackendSyncEnabled } from '../services/backendApi';
@@ -74,9 +75,9 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   };
 
   /**
-   * Save current flow to database
+   * Save current flow to database (with optional debounce bypass)
    */
-  const saveFlow = useCallback(async (flowName?: string): Promise<Flow> => {
+  const saveFlow = useCallback(async (flowName?: string, immediate = false): Promise<Flow> => {
     setState(prev => ({ ...prev, autosaveStatus: 'saving' }));
 
     try {
@@ -131,10 +132,14 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
       lastSavedNodesRef.current = JSON.stringify(nodes);
       lastSavedEdgesRef.current = JSON.stringify(edges);
 
-      // Reset to idle after 2 seconds
-      setTimeout(() => {
+      // Reset to idle after 2 seconds (skip for immediate saves)
+      if (!immediate) {
+        setTimeout(() => {
+          setState(prev => ({ ...prev, autosaveStatus: 'idle' }));
+        }, 2000);
+      } else {
         setState(prev => ({ ...prev, autosaveStatus: 'idle' }));
-      }, 2000);
+      }
 
       return savedFlow;
     } catch (error) {
@@ -151,10 +156,34 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   }, [state.currentFlowId, state.currentFlowName, toObject, nodes, edges]);
 
   /**
+   * Force immediate save without debounce
+   * Use for critical operations: flow switches, manual saves, browser close
+   */
+  const forceSave = useCallback(async (flowName?: string): Promise<Flow | null> => {
+    // Only save if there's an active flow or changes to save
+    if (!state.currentFlowId && nodes.length === 0) {
+      return null;
+    }
+
+    try {
+      return await saveFlow(flowName, true);
+    } catch (error) {
+      console.error('Force save failed:', error);
+      return null;
+    }
+  }, [state.currentFlowId, nodes.length, saveFlow]);
+
+  /**
    * Load flow from database by ID and apply to canvas
+   * Automatically saves current flow before switching
    */
   const loadFlow = useCallback(async (flowId: string) => {
     try {
+      // Force save current flow before switching (critical operation)
+      if (state.currentFlowId && state.isDirty) {
+        await forceSave();
+      }
+
       const { accessFlow } = await import('../db/database');
       const flow = await db.flows.get(flowId);
 
@@ -198,7 +227,7 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
       console.error('Failed to load flow:', error);
       throw error;
     }
-  }, []);
+  }, [state.currentFlowId, state.isDirty, forceSave]);
 
   /**
    * Create new flow (clear current state)
@@ -344,10 +373,21 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
 
   /**
    * Restore last opened flow on mount
+   * Option 2: Uses enhanced restore logic with lastAccessedAt fallback
    */
   useEffect(() => {
     const restoreLastFlow = async () => {
-      const lastFlowId = await getLastOpenedFlowId();
+      // Try localStorage first (fastest)
+      let lastFlowId = await getLastOpenedFlowId();
+
+      // Fallback to IndexedDB query for most recently accessed flow
+      if (!lastFlowId) {
+        const recentFlow = await getMostRecentlyAccessedFlow();
+        if (recentFlow) {
+          lastFlowId = recentFlow.id;
+          console.log('Restored most recently accessed flow from IndexedDB:', recentFlow.name);
+        }
+      }
 
       if (lastFlowId) {
         try {
@@ -363,12 +403,39 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
     restoreLastFlow();
   }, [loadFlow]);
 
+  /**
+   * Option 3: Browser beforeunload Hook
+   * Force save before browser close/refresh to catch changes during debounce window
+   */
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Only trigger if there are unsaved changes
+      if (state.isDirty && state.currentFlowId) {
+        // Force synchronous save (best effort)
+        forceSave().catch(err => {
+          console.error('Failed to save before unload:', err);
+        });
+
+        // Show browser confirmation if there are unsaved changes
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [state.isDirty, state.currentFlowId, forceSave]);
+
   return {
     // State
     ...state,
 
     // Actions
     saveFlow,
+    forceSave,
     loadFlow,
     newFlow,
     renameFlow,

@@ -11,6 +11,11 @@
     "Ref": {
       "command": "npx",
       "args": ["-y", "@punkpeye/ref-mcp-server"]
+    },
+    "browser-automation": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "description": "Official Playwright browser automation - Cross-browser testing, screenshots, and web automation"
     }
   }
 }
