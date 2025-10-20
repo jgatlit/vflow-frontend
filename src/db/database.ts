@@ -644,13 +644,18 @@ export async function createFlowWithMetadata(
   };
 
   // Sanitize the entire flow object to remove circular references and non-serializable data
+  console.log('[createFlowWithMetadata] Sanitizing flow object...');
   const sanitizedFlow = sanitizeForStorage(newFlow);
+  console.log('[createFlowWithMetadata] Sanitization complete');
 
   if (!sanitizedFlow) {
+    console.error('[createFlowWithMetadata] Sanitization failed!');
     throw new Error('Failed to sanitize flow object for storage');
   }
 
+  console.log('[createFlowWithMetadata] Adding flow to database...');
   await db.flows.add(sanitizedFlow);
+  console.log('[createFlowWithMetadata] Flow added successfully');
   return sanitizedFlow;
 }
 

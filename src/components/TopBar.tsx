@@ -20,6 +20,7 @@ interface TopBarProps {
   onRunFlow: () => void;
   onSaveFlow: () => Promise<any>;
   onNewFlow: () => void;
+  onImportFlow: (name: string) => void;
   isExecuting: boolean;
   historyCount: number;
   showFlows: boolean;
@@ -36,6 +37,7 @@ const TopBar = ({
   onRunFlow,
   onSaveFlow,
   onNewFlow,
+  onImportFlow,
   isExecuting,
   historyCount,
   showFlows,
@@ -115,8 +117,8 @@ const TopBar = ({
 
         {/* Import/Export Buttons */}
         <ReactFlowProvider>
-          <ImportButton />
-          <ExportButton />
+          <ImportButton onImportComplete={onImportFlow} />
+          <ExportButton flowName={flowName} />
         </ReactFlowProvider>
 
         {/* Divider */}

@@ -61,9 +61,12 @@ export async function syncFlowToBackend(flow: Flow): Promise<BackendResponse<Flo
         signal: AbortSignal.timeout(5000) // 5s timeout
       });
 
+      // Track if we created a new flow
+      let wasCreated = false;
+
       // If 404 (not found), try CREATE (POST)
       if (response.status === 404) {
-        console.log('Flow not found in backend, creating new...');
+        console.log('[backendSync] Flow not found in backend, creating new...');
         response = await fetch(`${BACKEND_URL}/api/flows`, {
           method: 'POST',
           headers: {
@@ -73,11 +76,17 @@ export async function syncFlowToBackend(flow: Flow): Promise<BackendResponse<Flo
           body: JSON.stringify(flow),
           signal: AbortSignal.timeout(5000)
         });
+        wasCreated = true;
       }
 
       if (response.ok) {
         const data = await response.json();
-        return { success: true, data };
+        console.log('[backendSync] Success', {
+          wasCreated,
+          frontendId: flow.id,
+          backendId: data.id
+        });
+        return { success: true, data, wasCreated } as any;
       }
 
       // Server error (5xx) - retry

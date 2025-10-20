@@ -44,6 +44,7 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   const autosaveTimerRef = useRef<number | null>(null);
   const lastSavedNodesRef = useRef<string>('');
   const lastSavedEdgesRef = useRef<string>('');
+  const isImportingRef = useRef<boolean>(false);
 
   /**
    * Sanitize React Flow object to remove non-serializable data
@@ -78,6 +79,15 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
    * Save current flow to database (with optional debounce bypass)
    */
   const saveFlow = useCallback(async (flowName?: string, immediate = false): Promise<Flow> => {
+    console.log('[saveFlow] START', {
+      flowName,
+      immediate,
+      currentFlowId: state.currentFlowId,
+      currentFlowName: state.currentFlowName,
+      nodesCount: nodes.length,
+      edgesCount: edges.length
+    });
+
     setState(prev => ({ ...prev, autosaveStatus: 'saving' }));
 
     try {
@@ -89,6 +99,7 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
 
       if (state.currentFlowId) {
         // Update existing flow
+        console.log('[saveFlow] Updating existing flow', { id: state.currentFlowId, name });
         savedFlow = await updateFlowWithMetadata(state.currentFlowId, {
           name,
           flow: sanitizedFlow,
@@ -96,6 +107,7 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
         });
       } else {
         // Create new flow
+        console.log('[saveFlow] Creating new flow', { name });
         savedFlow = await createFlowWithMetadata(name, sanitizedFlow, {
           description: `Flow with ${nodes.length} nodes and ${edges.length} connections`,
           tags: ['auto-generated'],
@@ -107,9 +119,47 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
 
       // Parallel backend sync (non-blocking)
       if (isBackendSyncEnabled()) {
-        syncFlowToBackend(savedFlow).then(result => {
+        syncFlowToBackend(savedFlow).then(async (result: any) => {
           if (result.success) {
             console.log('✅ Backend sync successful');
+
+            // If backend created a new flow with different ID, sync IndexedDB
+            if (result.wasCreated && result.data?.id && result.data.id !== savedFlow.id) {
+              console.log('[backendSync] Backend created new ID, syncing IndexedDB', {
+                oldId: savedFlow.id,
+                newId: result.data.id
+              });
+
+              try {
+                // Update IndexedDB flow with backend ID
+                const { db } = await import('../db/database');
+                const flow = await db.flows.get(savedFlow.id);
+
+                if (flow) {
+                  // Delete old flow
+                  await db.flows.delete(savedFlow.id);
+
+                  // Create new flow with backend ID
+                  await db.flows.add({
+                    ...flow,
+                    id: result.data.id
+                  });
+
+                  // Update local state with backend ID
+                  setState(prev => ({
+                    ...prev,
+                    currentFlowId: result.data.id
+                  }));
+
+                  // Update localStorage reference
+                  localStorage.setItem('lastOpenedFlowId', result.data.id);
+
+                  console.log('[backendSync] IndexedDB synchronized with backend ID');
+                }
+              } catch (err) {
+                console.error('[backendSync] Failed to sync IndexedDB:', err);
+              }
+            }
           } else {
             console.warn('⚠️ Backend sync failed:', result.error);
           }
@@ -131,6 +181,12 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
       // Update refs to track saved state
       lastSavedNodesRef.current = JSON.stringify(nodes);
       lastSavedEdgesRef.current = JSON.stringify(edges);
+
+      console.log('[saveFlow] SUCCESS', {
+        id: savedFlow.id,
+        name: savedFlow.name,
+        updatedAt: savedFlow.updatedAt
+      });
 
       // Reset to idle after 2 seconds (skip for immediate saves)
       if (!immediate) {
@@ -233,6 +289,8 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
    * Create new flow (clear current state)
    */
   const newFlow = useCallback(async () => {
+    console.log('[newFlow] Creating new flow');
+
     // Clear canvas
     const { useFlowStore } = await import('../store/flowStore');
     const { setNodes, setEdges } = useFlowStore.getState();
@@ -251,6 +309,8 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
     lastSavedEdgesRef.current = '';
 
     localStorage.removeItem('lastOpenedFlowId');
+
+    console.log('[newFlow] New flow created - canvas cleared');
   }, []);
 
   /**
@@ -259,6 +319,12 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
    * This allows users to create variants/copies by changing the name
    */
   const saveAsNewFlow = useCallback(async (newName: string) => {
+    console.log('[saveAsNewFlow] Renaming/saving as new flow', {
+      oldName: state.currentFlowName,
+      newName,
+      currentFlowId: state.currentFlowId
+    });
+
     setState(prev => ({
       ...prev,
       currentFlowName: newName,
@@ -280,9 +346,47 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
 
       // Parallel backend sync (non-blocking)
       if (isBackendSyncEnabled()) {
-        syncFlowToBackend(savedFlow).then(result => {
+        syncFlowToBackend(savedFlow).then(async (result: any) => {
           if (result.success) {
             console.log('✅ Backend sync successful');
+
+            // If backend created a new flow with different ID, sync IndexedDB
+            if (result.wasCreated && result.data?.id && result.data.id !== savedFlow.id) {
+              console.log('[backendSync] Backend created new ID, syncing IndexedDB', {
+                oldId: savedFlow.id,
+                newId: result.data.id
+              });
+
+              try {
+                // Update IndexedDB flow with backend ID
+                const { db } = await import('../db/database');
+                const flow = await db.flows.get(savedFlow.id);
+
+                if (flow) {
+                  // Delete old flow
+                  await db.flows.delete(savedFlow.id);
+
+                  // Create new flow with backend ID
+                  await db.flows.add({
+                    ...flow,
+                    id: result.data.id
+                  });
+
+                  // Update local state with backend ID
+                  setState(prev => ({
+                    ...prev,
+                    currentFlowId: result.data.id
+                  }));
+
+                  // Update localStorage reference
+                  localStorage.setItem('lastOpenedFlowId', result.data.id);
+
+                  console.log('[backendSync] IndexedDB synchronized with backend ID');
+                }
+              } catch (err) {
+                console.error('[backendSync] Failed to sync IndexedDB:', err);
+              }
+            }
           } else {
             console.warn('⚠️ Backend sync failed:', result.error);
           }
@@ -331,9 +435,90 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
   const renameFlow = saveAsNewFlow;
 
   /**
+   * Import flow - Set metadata from imported workflow and trigger autosave
+   * Uses a simplified approach: just use the imported name and let saveFlow handle creation
+   *
+   * Uses import flag to prevent race conditions with autosave effect
+   */
+  const importFlow = useCallback(async (name: string) => {
+    console.log('[importFlow] START', { name, currentNodes: nodes.length, currentEdges: edges.length });
+
+    // Set import flag to block autosave during import
+    isImportingRef.current = true;
+
+    try {
+      // Use the name as-is (no deduplication during import)
+      // The saveFlow operation will create a new flow entry with this name
+      const finalName = name;
+
+      console.log('[importFlow] Using name:', finalName);
+
+      setState(prev => {
+        console.log('[importFlow] setState', {
+          prev: prev.currentFlowName,
+          next: finalName,
+          prevStatus: prev.autosaveStatus,
+          prevFlowId: prev.currentFlowId
+        });
+        return {
+          ...prev,
+          currentFlowId: null, // Clear ID so next save creates new flow
+          currentFlowName: finalName,
+          isDirty: false, // Starts clean, autosave will trigger from nodes changing
+          lastSavedAt: null,
+          autosaveStatus: 'idle', // Reset status from any previous saves
+        };
+      });
+
+      // Update refs IMMEDIATELY to sync with imported state
+      // This prevents autosave from detecting changes during the import process
+      lastSavedNodesRef.current = JSON.stringify(nodes);
+      lastSavedEdgesRef.current = JSON.stringify(edges);
+
+      console.log('[importFlow] Refs updated, scheduling save');
+
+      // Schedule explicit save after debounce period
+      // This ensures the imported flow gets saved as a new flow
+      setTimeout(async () => {
+        try {
+          console.log('[importFlow] Executing scheduled save');
+          await saveFlow(finalName);
+          console.log('[importFlow] Save completed successfully');
+        } catch (err) {
+          console.error('[importFlow] Scheduled save failed:', err);
+        }
+      }, 2500); // Slightly longer than autosave debounce to avoid conflicts
+
+      console.log('[importFlow] END');
+    } catch (error) {
+      console.error('[importFlow] ERROR:', error);
+      // Still clear the flag even on error
+      setTimeout(() => {
+        isImportingRef.current = false;
+        console.log('[importFlow] Import flag cleared (after error)');
+      }, 100);
+      throw error; // Re-throw to propagate to caller
+    } finally {
+      // Clear import flag after short delay to ensure state updates have propagated
+      setTimeout(() => {
+        isImportingRef.current = false;
+        console.log('[importFlow] Import flag cleared');
+      }, 100);
+    }
+  }, [nodes, edges, saveFlow]);
+
+  /**
    * Autosave logic - debounced save on changes
+   * CRITICAL: Uses refs to avoid setState loops
+   * Respects import flag to prevent race conditions during import
    */
   useEffect(() => {
+    // Skip autosave during import to prevent race conditions
+    if (isImportingRef.current) {
+      console.log('[autosave] Skipped - import in progress');
+      return;
+    }
+
     if (!autosaveEnabled) return;
 
     // Check if flow has changed since last save
@@ -344,10 +529,18 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
       currentNodesStr !== lastSavedNodesRef.current ||
       currentEdgesStr !== lastSavedEdgesRef.current;
 
+    console.log('[autosave] Trigger check', {
+      hasChanged,
+      currentFlowId: state.currentFlowId,
+      nodesCount: nodes.length,
+      edgesCount: edges.length,
+      isImporting: isImportingRef.current
+    });
+
     if (!hasChanged) return;
 
-    // Mark as dirty
-    setState(prev => ({ ...prev, isDirty: true }));
+    // DON'T call setState here - it triggers re-renders and callback recreations
+    // The saveFlow() will handle state updates when it actually saves
 
     // Clear existing timer
     if (autosaveTimerRef.current) {
@@ -358,9 +551,12 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
     autosaveTimerRef.current = setTimeout(() => {
       // Only autosave if we have a current flow ID (i.e., flow has been saved at least once)
       if (state.currentFlowId) {
+        console.log('[autosave] Executing save');
         saveFlow().catch(err => {
-          console.error('Autosave failed:', err);
+          console.error('[autosave] Failed:', err);
         });
+      } else {
+        console.log('[autosave] Skipped - no currentFlowId (new/imported flow)');
       }
     }, autosaveDelayMs);
 
@@ -369,11 +565,12 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [nodes, edges, autosaveEnabled, autosaveDelayMs, state.currentFlowId, saveFlow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges, autosaveEnabled, autosaveDelayMs, state.currentFlowId]);
 
   /**
-   * Restore last opened flow on mount
-   * Option 2: Uses enhanced restore logic with lastAccessedAt fallback
+   * Restore last opened flow on mount ONLY
+   * CRITICAL: Empty dependency array prevents re-running on state changes
    */
   useEffect(() => {
     const restoreLastFlow = async () => {
@@ -390,18 +587,49 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
       }
 
       if (lastFlowId) {
-        try {
-          await loadFlow(lastFlowId);
-        } catch (error) {
-          console.error('Failed to restore last flow:', error);
-          // Clear invalid reference
+        // Import loadFlow locally to avoid dependency
+        const { accessFlow } = await import('../db/database');
+        const flow = await db.flows.get(lastFlowId);
+
+        if (!flow) {
+          console.error(`Flow not found: ${lastFlowId}`);
           localStorage.removeItem('lastOpenedFlowId');
+          return;
         }
+
+        // Import useFlowStore dynamically
+        const { useFlowStore } = await import('../store/flowStore');
+        const { setNodes, setEdges } = useFlowStore.getState();
+
+        // Apply flow to canvas
+        if (flow.flow.nodes) {
+          setNodes(flow.flow.nodes as any[]);
+        }
+        if (flow.flow.edges) {
+          setEdges(flow.flow.edges as any[]);
+        }
+
+        // Update access tracking
+        await accessFlow(lastFlowId);
+
+        // Update local state
+        setState({
+          currentFlowId: flow.id,
+          currentFlowName: flow.name,
+          autosaveStatus: 'idle',
+          lastSavedAt: flow.updatedAt,
+          isDirty: false,
+        });
+
+        // Update refs
+        lastSavedNodesRef.current = JSON.stringify(flow.flow.nodes);
+        lastSavedEdgesRef.current = JSON.stringify(flow.flow.edges);
       }
     };
 
     restoreLastFlow();
-  }, [loadFlow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // EMPTY ARRAY - only run on mount
 
   /**
    * Option 3: Browser beforeunload Hook
@@ -439,5 +667,6 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
     loadFlow,
     newFlow,
     renameFlow,
+    importFlow, // New: allows ImportButton to update flow metadata
   };
 }

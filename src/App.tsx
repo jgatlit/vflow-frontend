@@ -40,6 +40,7 @@ function AppContent() {
     loadFlow,
     newFlow,
     renameFlow,
+    importFlow,
   } = useFlowPersistence({ autosaveEnabled: true, autosaveDelayMs: 2000 });
 
   const onNodesChange = useCallback(
@@ -195,6 +196,7 @@ function AppContent() {
         onRunFlow={() => handleExecute({})}
         onSaveFlow={() => saveFlow()}
         onNewFlow={newFlow}
+        onImportFlow={importFlow}
         isExecuting={isExecuting}
         historyCount={executionHistory.length}
         showFlows={showFlows}

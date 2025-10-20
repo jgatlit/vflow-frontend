@@ -13,7 +13,11 @@ import { isSafeToExport } from '../utils/secretScanning';
 import type { ExportOptions } from '../types/workflow-export';
 import { cn } from '../lib/utils';
 
-export default function ExportButton() {
+interface ExportButtonProps {
+  flowName?: string;
+}
+
+export default function ExportButton({ flowName }: ExportButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,14 +35,9 @@ export default function ExportButton() {
   });
 
   const handleOpenModal = () => {
-    // Pre-fill with current flow name if available
-    const currentFlowId = useFlowStore.getState().currentFlowId;
-    const currentFlow = useFlowStore
-      .getState()
-      .savedFlows.find((f) => f.id === currentFlowId);
-
+    // Pre-fill with current flow name from prop
     setFormData({
-      name: currentFlow?.name || 'My Workflow',
+      name: flowName || 'My Workflow',
       description: '',
       author: '',
       tags: [],
@@ -50,6 +49,12 @@ export default function ExportButton() {
   };
 
   const handleExport = async () => {
+    console.log('[export] Starting export', {
+      flowName: formData.name,
+      nodesCount: nodes.length,
+      edgesCount: edges.length
+    });
+
     setError(null);
     setWarnings([]);
     setIsExporting(true);
@@ -91,13 +96,14 @@ export default function ExportButton() {
       const result = await performExport(nodes, edges, viewport, formData);
 
       if (result.success) {
+        console.log('[export] SUCCESS', { flowName: formData.name });
         setIsModalOpen(false);
-        // Success notification could go here
-        console.log('Export successful');
       } else {
+        console.error('[export] FAILED', { error: result.error });
         setError(result.error || 'Export failed');
       }
     } catch (err) {
+      console.error('[export] ERROR', err);
       setError(err instanceof Error ? err.message : 'Export failed');
     } finally {
       setIsExporting(false);

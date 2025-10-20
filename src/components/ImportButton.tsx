@@ -18,7 +18,11 @@ import type { WorkflowExport } from '../types/workflow-export';
 import { cn } from '../lib/utils';
 import CredentialMappingModal from './CredentialMappingModal';
 
-export default function ImportButton() {
+interface ImportButtonProps {
+  onImportComplete?: (flowName: string) => void;
+}
+
+export default function ImportButton({ onImportComplete }: ImportButtonProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [importedWorkflow, setImportedWorkflow] = useState<WorkflowExport | null>(null);
   const [showCredentialModal, setShowCredentialModal] = useState(false);
@@ -37,6 +41,8 @@ export default function ImportButton() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    console.log('[import] Starting import', { filename: file.name });
 
     setIsImporting(true);
     setError(null);
@@ -67,6 +73,20 @@ export default function ImportButton() {
           setViewport
         );
 
+        // Extract and clean flow name from .vflow filename
+        const cleanedName = result.workflow.meta?.name || 'Imported Flow';
+
+        console.log('[import] Direct import success', { flowName: cleanedName, nodesCount: result.workflow.flow.nodes?.length });
+
+        // Notify parent to update flow metadata (deduplicates name if exists)
+        try {
+          await onImportComplete?.(cleanedName);
+          console.log('[import] onImportComplete finished');
+        } catch (importErr) {
+          console.error('[import] onImportComplete failed:', importErr);
+          throw importErr;
+        }
+
         setSuccess(true);
         setTimeout(() => {
           fitView({ padding: 0.2 });
@@ -85,7 +105,7 @@ export default function ImportButton() {
     }
   };
 
-  const handleCredentialMappingComplete = (mappings: Record<string, string>) => {
+  const handleCredentialMappingComplete = async (mappings: Record<string, string>) => {
     if (!importedWorkflow) return;
 
     try {
@@ -97,6 +117,14 @@ export default function ImportButton() {
         setEdges,
         setViewport
       );
+
+      // Extract and clean flow name
+      const cleanedName = importedWorkflow.meta?.name || 'Imported Flow';
+
+      console.log('[import] Credential-mapped import success', { flowName: cleanedName, mappingsCount: Object.keys(mappings).length });
+
+      // Notify parent to update flow metadata (deduplicates name if exists)
+      await onImportComplete?.(cleanedName);
 
       setSuccess(true);
       setShowCredentialModal(false);
