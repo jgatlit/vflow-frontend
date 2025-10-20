@@ -22,6 +22,19 @@ interface ImportButtonProps {
   onImportComplete?: (flowName: string) => void;
 }
 
+/**
+ * Generate timestamp suffix in MMMDD-hhmm format
+ * Example: "Oct19-1430"
+ */
+function generateTimestampSuffix(): string {
+  const now = new Date();
+  const month = now.toLocaleString('en-US', { month: 'short' });
+  const day = now.getDate().toString().padStart(2, '0');
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  return `${month}${day}-${hours}${minutes}`;
+}
+
 export default function ImportButton({ onImportComplete }: ImportButtonProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [importedWorkflow, setImportedWorkflow] = useState<WorkflowExport | null>(null);
@@ -73,10 +86,17 @@ export default function ImportButton({ onImportComplete }: ImportButtonProps) {
           setViewport
         );
 
-        // Extract and clean flow name from .vflow filename
-        const cleanedName = result.workflow.meta?.name || 'Imported Flow';
+        // Extract and clean flow name from .vflow filename, append timestamp
+        const baseName = result.workflow.meta?.name || 'Imported Flow';
+        const timestamp = generateTimestampSuffix();
+        const cleanedName = `${baseName} ${timestamp}`;
 
-        console.log('[import] Direct import success', { flowName: cleanedName, nodesCount: result.workflow.flow.nodes?.length });
+        console.log('[import] Direct import success', {
+          baseName,
+          timestamp,
+          finalName: cleanedName,
+          nodesCount: result.workflow.flow.nodes?.length
+        });
 
         // Notify parent to update flow metadata (deduplicates name if exists)
         try {
@@ -118,10 +138,17 @@ export default function ImportButton({ onImportComplete }: ImportButtonProps) {
         setViewport
       );
 
-      // Extract and clean flow name
-      const cleanedName = importedWorkflow.meta?.name || 'Imported Flow';
+      // Extract and clean flow name, append timestamp
+      const baseName = importedWorkflow.meta?.name || 'Imported Flow';
+      const timestamp = generateTimestampSuffix();
+      const cleanedName = `${baseName} ${timestamp}`;
 
-      console.log('[import] Credential-mapped import success', { flowName: cleanedName, mappingsCount: Object.keys(mappings).length });
+      console.log('[import] Credential-mapped import success', {
+        baseName,
+        timestamp,
+        finalName: cleanedName,
+        mappingsCount: Object.keys(mappings).length
+      });
 
       // Notify parent to update flow metadata (deduplicates name if exists)
       await onImportComplete?.(cleanedName);
