@@ -4,6 +4,32 @@ import { executePython, executeJavaScript } from './codeExecutionService';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+/**
+ * Map frontend tool IDs (snake_case) to backend tool IDs (camelCase)
+ * Frontend uses snake_case for consistency with UI naming conventions
+ * Backend uses camelCase to match TypeScript/JavaScript conventions
+ */
+const TOOL_ID_MAP: Record<string, string> = {
+  'web_search': 'webSearch',
+  'calculator': 'calculator',
+  'code_interpreter': 'codeInterpreter',
+  'file_read': 'fileRead',
+  'file_write': 'fileWrite',
+  'database_query': 'databaseQuery',
+  'http_request': 'httpRequest',
+  'email_sender': 'emailSender',
+};
+
+/**
+ * Convert frontend tool IDs to backend tool IDs
+ */
+function mapToolIds(frontendToolIds?: string[]): string[] | undefined {
+  if (!frontendToolIds || frontendToolIds.length === 0) {
+    return undefined;
+  }
+  return frontendToolIds.map(id => TOOL_ID_MAP[id] || id);
+}
+
 export interface NodeExecutionRequest {
   nodeId: string;
   nodeType: string;
@@ -59,6 +85,8 @@ export async function executeNode(request: NodeExecutionRequest): Promise<Execut
         outputFormat: request.data.outputFormat,
         jsonSchema: request.data.jsonSchema,
         csvFields: request.data.csvFields,
+        enabledTools: mapToolIds(request.data.enabledTools), // Convert snake_case to camelCase for backend
+        maxToolRounds: request.data.maxToolRounds || 5, // Maximum tool calling rounds
       }),
     });
 
@@ -99,6 +127,7 @@ export async function executeNode(request: NodeExecutionRequest): Promise<Execut
       nodeId: request.nodeId,
       output: data.result.text,
       executedAt: new Date().toISOString(),
+      traceId: data.result.traceId,  // Include trace ID from backend
       metadata: {
         model: data.result.model,
         tokensUsed: data.result.usage?.totalTokens,
@@ -505,7 +534,7 @@ export async function executeFlow(
   // Complete execution tracking if enabled
   if (executionId) {
     try {
-      const { completeExecutionWithMetadata } = await import('../db/database');
+      const { saveExecutionWithTrace } = await import('../db/database');
       const duration = Date.now() - startTime;
       const hasErrors = Array.from(context.results.values()).some(r => r.error);
       const results = Array.from(context.results.entries()).map(([nodeId, result]) => ({
@@ -513,9 +542,10 @@ export async function executeFlow(
         nodeId,
       }));
 
-      await completeExecutionWithMetadata(
+      await saveExecutionWithTrace(
         executionId,
         results,
+        undefined, // traceId not available in this context
         {
           status: hasErrors ? 'failed' : 'completed',
           error: hasErrors ? 'One or more nodes failed' : undefined,
@@ -530,4 +560,290 @@ export async function executeFlow(
   }
 
   return context.results;
+}
+
+/**
+ * Execute entire flow with unified parent trace (backend orchestration)
+ * This creates a single parent trace in LangSmith with all nodes as children
+ */
+export async function executeFlowWithTrace(
+  nodes: Node[],
+  edges: Edge[],
+  initialVariables: Record<string, string> = {}
+): Promise<{
+  executionId: string;
+  traceId?: string;
+  results: Map<string, ExecutionResult>;
+}> {
+  try {
+    const response = await fetch(`${API_URL}/api/execute/flow`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nodes: nodes.map(n => ({
+          id: n.id,
+          type: n.type,
+          data: n.data,
+        })),
+        edges: edges.map(e => ({
+          source: e.source,
+          target: e.target,
+        })),
+        variables: initialVariables,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Flow execution failed';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } else {
+          errorMessage = await response.text();
+        }
+      } catch (e) {
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+
+    // Convert results object to Map
+    const resultsMap = new Map<string, ExecutionResult>();
+    if (data.results) {
+      Object.entries(data.results).forEach(([nodeId, result]: [string, any]) => {
+        resultsMap.set(nodeId, result);
+      });
+    }
+
+    return {
+      executionId: data.executionId,
+      traceId: data.traceId,  // Parent trace ID for viewing all nodes
+      results: resultsMap,
+    };
+  } catch (error: any) {
+    throw new Error(`Flow execution failed: ${error.message}`);
+  }
+}
+
+/**
+ * Execute an agent node with multi-step reasoning
+ * Note: This will be enhanced with WebSocket streaming when backend support is added
+ */
+export async function executeAgentNode(nodeData: any): Promise<ExecutionResult> {
+  const startTime = Date.now();
+  const executionId = nodeData.executionId || crypto.randomUUID();
+
+  try {
+    // Substitute variables in prompts
+    const systemPrompt = nodeData.systemPrompt || '';
+    const userPrompt = nodeData.userPrompt || '';
+
+    // Make API request to agent endpoint
+    // TODO: This endpoint will be implemented in the backend
+    const response = await fetch(`${API_URL}/api/execute/agent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        executionId,
+        provider: nodeData.provider || 'anthropic',
+        model: nodeData.model || 'claude-sonnet-4-5-20250929',
+        systemPrompt,
+        userPrompt,
+        temperature: nodeData.temperature || 0.7,
+        maxTokens: nodeData.maxTokens || 4096,
+        enabledTools: nodeData.enabledTools || [],
+        toolConfigs: nodeData.toolConfigs || {},
+        maxAgentSteps: nodeData.maxAgentSteps || 5,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Agent execution failed';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } else {
+          errorMessage = await response.text();
+        }
+      } catch (e) {
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    const duration = Date.now() - startTime;
+
+    return {
+      nodeId: nodeData.nodeId || executionId,
+      output: data.result?.finalAnswer || data.result?.text || '',
+      executedAt: new Date().toISOString(),
+      metadata: {
+        model: data.result?.model,
+        tokensUsed: data.result?.usage?.totalTokens,
+        duration,
+        steps: data.result?.steps || [],
+        executionId,
+      },
+    };
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    return {
+      nodeId: nodeData.nodeId || executionId,
+      output: '',
+      error: error.message,
+      executedAt: new Date().toISOString(),
+      metadata: {
+        duration,
+        executionId,
+      },
+    };
+  }
+}
+
+// ===== EXECUTION HISTORY API =====
+
+export interface ExecutionHistoryItem {
+  id: string;
+  flowId: string;
+  flowName: string;
+  flowVersion: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  startedAt: string;
+  completedAt?: string;
+  duration?: number;
+  results: ExecutionResult[];
+  parentTraceId?: string;
+  error?: string;
+}
+
+/**
+ * Fetch execution history for a specific flow from backend
+ *
+ * @param flowId - The flow ID to fetch executions for
+ * @param limit - Maximum number of executions to return (default: 10)
+ * @returns Promise resolving to array of execution history items
+ */
+export async function fetchExecutionHistory(
+  flowId: string,
+  limit: number = 10
+): Promise<ExecutionHistoryItem[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/executions?flowId=${flowId}&limit=${limit}`);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Failed to fetch executions: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.executions || [];
+  } catch (error) {
+    console.error('[ExecutionService] Failed to fetch execution history:', error);
+    throw error;
+  }
+}
+
+/**
+ * Complete an execution in the backend (creates execution record if doesn't exist)
+ *
+ * @param executionId - The execution ID to complete
+ * @param results - Execution results array
+ * @param status - Final execution status
+ * @param parentTraceId - Optional parent trace ID
+ * @param error - Optional error message if failed
+ * @param flowId - Flow ID (required for creating execution if doesn't exist)
+ * @param flowName - Flow name (required for creating execution if doesn't exist)
+ * @param flowVersion - Flow version (defaults to '1.0.0')
+ */
+export async function completeBackendExecution(
+  executionId: string,
+  results: ExecutionResult[],
+  status: 'completed' | 'failed' | 'cancelled',
+  parentTraceId?: string,
+  error?: string,
+  flowId?: string,
+  flowName?: string,
+  flowVersion: string = '1.0.0'
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_URL}/api/executions/${executionId}/complete`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        status,
+        results,
+        parentTraceId,
+        error,
+        flowId,
+        flowName,
+        flowVersion,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Failed to complete execution: ${response.statusText}`);
+    }
+
+    console.log(`[ExecutionService] Completed execution ${executionId} (status: ${status})`);
+  } catch (error) {
+    console.error('[ExecutionService] Failed to complete execution:', error);
+    // Don't throw - execution completion to backend is best-effort
+    // Local history still works even if backend save fails
+  }
+}
+
+/**
+ * Create a new execution record in the backend
+ *
+ * @param flowId - Flow ID being executed
+ * @param flowName - Flow name
+ * @param flowVersion - Flow version
+ * @returns The created execution ID
+ */
+export async function createBackendExecution(
+  flowId: string,
+  flowName: string,
+  flowVersion: string
+): Promise<string> {
+  try {
+    const response = await fetch(`${API_URL}/api/executions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        flowId,
+        flowName,
+        flowVersion,
+        trigger: 'manual',
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Failed to create execution: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[ExecutionService] Created execution ${data.id}`);
+    return data.id;
+  } catch (error) {
+    console.error('[ExecutionService] Failed to create execution:', error);
+    // Return a UUID if backend creation fails - local execution still works
+    return crypto.randomUUID();
+  }
 }
