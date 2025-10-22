@@ -14,7 +14,7 @@ import type {
 import { validateWorkflowExport } from '../utils/validation';
 import { scanForSecrets } from '../utils/secretScanning';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL ?? '/api';
 const CURRENT_VERSION = '1.0.0';
 const SCHEMA_VERSION = 'v1';
 

@@ -12,7 +12,7 @@ import type {
 } from '../types/workflow-export';
 import { validateWorkflowExport, validateConnections } from '../utils/validation';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL ?? '/api';
 const SUPPORTED_VERSIONS = ['v1'];
 
 /**

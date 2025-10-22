@@ -2,7 +2,7 @@ import type { WebhookConfig, WebhookOutNodeData, WebhookExecutionResult } from '
 import type { ExecutionResult } from '../utils/executionEngine';
 import { substituteVariables, type ExecutionContext } from '../utils/executionEngine';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 /**
  * Webhook Service - API client for webhook operations

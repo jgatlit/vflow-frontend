@@ -4,7 +4,7 @@ import { executePython, executeJavaScript } from './codeExecutionService';
 import { WebhookService } from './webhookService';
 import type { WebhookOutNodeData } from '../types/webhook';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 /**
  * Map frontend tool IDs (snake_case) to backend tool IDs (camelCase)
