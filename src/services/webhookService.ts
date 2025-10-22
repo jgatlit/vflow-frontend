@@ -90,6 +90,7 @@ export class WebhookService {
 
   /**
    * Generate cURL command for testing a webhook
+   * Returns a portable shell script that avoids common parsing issues
    */
   static generateCurlCommand(webhookUrl: string, webhookSecret?: string): string {
     // Use single-line JSON (no pretty-printing) to avoid issues with newlines in bash
@@ -102,17 +103,76 @@ export class WebhookService {
   -d '${payload}'`;
     }
 
-    // cURL with HMAC signature generation
-    return `# Generate HMAC signature
+    // Generate portable shell script format
+    // Uses script file approach to avoid shell parsing issues with direct paste
+    return `#!/bin/bash
+# Webhook Test Script
+# Generated: ${new Date().toISOString()}
+# URL: ${webhookUrl}
+
 WEBHOOK_SECRET="${webhookSecret}"
 PAYLOAD='${payload}'
+
+# Generate HMAC-SHA256 signature
 SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | sed 's/^.* //')
 
 # Send webhook request
 curl -X POST ${webhookUrl} \\
   -H "Content-Type: application/json" \\
   -H "x-webhook-signature: sha256=$SIGNATURE" \\
-  -d "$PAYLOAD"`;
+  -d "$PAYLOAD"
+
+# Alternative: Save as webhook-test.sh, chmod +x webhook-test.sh, ./webhook-test.sh`;
+  }
+
+  /**
+   * Generate webhook test patterns in multiple formats
+   * Useful for documentation and different implementation contexts
+   */
+  static generateWebhookTestPatterns(webhookUrl: string, webhookSecret?: string): {
+    bash: string;
+    oneliner: string;
+    json: string;
+    curl: string;
+  } {
+    const payload = JSON.stringify({ test: 'data', message: 'Hello from webhook' });
+
+    if (!webhookSecret) {
+      return {
+        bash: this.generateCurlCommand(webhookUrl),
+        oneliner: `curl -X POST ${webhookUrl} -H "Content-Type: application/json" -d '${payload}'`,
+        json: JSON.stringify({ url: webhookUrl, payload: JSON.parse(payload) }, null, 2),
+        curl: this.generateCurlCommand(webhookUrl),
+      };
+    }
+
+    // Bash script format (recommended for file execution)
+    const bash = this.generateCurlCommand(webhookUrl, webhookSecret);
+
+    // One-liner format (for direct terminal paste - be careful with special chars)
+    const oneliner = `WEBHOOK_SECRET="${webhookSecret}"; PAYLOAD='${payload}'; SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | sed 's/^.* //'); curl -X POST ${webhookUrl} -H "Content-Type: application/json" -H "x-webhook-signature: sha256=$SIGNATURE" -d "$PAYLOAD"`;
+
+    // JSON format (for programmatic use)
+    const json = JSON.stringify({
+      url: webhookUrl,
+      secret: webhookSecret,
+      payload: JSON.parse(payload),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-signature': 'sha256={HMAC-SHA256(payload, secret)}'
+      },
+      signatureGeneration: {
+        algorithm: 'HMAC-SHA256',
+        input: 'raw JSON payload string',
+        secret: webhookSecret,
+        format: 'sha256={hex_digest}'
+      }
+    }, null, 2);
+
+    // cURL-only format (no variables)
+    const curl = bash;
+
+    return { bash, oneliner, json, curl };
   }
 
   /**
