@@ -159,6 +159,7 @@ const WebhookInNode = ({ id, data, selected }: NodeProps) => {
         maxRequestsPerMinute: nodeData.maxRequestsPerMinute ?? 60,
         allowedIPs: nodeData.allowedIPs ?? [],
         requireSignature: nodeData.requireSignature ?? true,
+        customPath: nodeData.customPath || undefined, // Include custom path in save request
       });
 
       console.log('[handleSaveConfig] Received config from backend:', savedConfig);
