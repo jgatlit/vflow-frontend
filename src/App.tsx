@@ -1,6 +1,6 @@
 import { ReactFlow, Background, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, addEdge, ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeChange, EdgeChange, Connection } from '@xyflow/react';
 import type { DragEvent } from 'react';
 import { nodeTypes } from './nodes';
@@ -9,10 +9,13 @@ import TopBar from './components/TopBar';
 import FlowListSidebar from './components/FlowListSidebar';
 import ExecutionPanel, { type ExecutionHistory } from './components/ExecutionPanel';
 import VersionDisplay from './components/VersionDisplay';
-import { executeFlow } from './services/executionService';
+import { executeFlow, executeFlowWithTrace } from './services/executionService';
 import type { ExecutionResult } from './utils/executionEngine';
 import { useFlowStore } from './store/flowStore';
 import { useFlowPersistence } from './hooks/useFlowPersistence';
+import { TraceCacheProvider } from './contexts/TraceCacheContext';
+import { loadExecutionHistory, saveExecutionWithTrace } from './db/database';
+import { fetchExecutionHistory, completeBackendExecution, type ExecutionHistoryItem } from './services/executionService';
 
 function AppContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -42,6 +45,79 @@ function AppContent() {
     renameFlow,
     importFlow,
   } = useFlowPersistence({ autosaveEnabled: true, autosaveDelayMs: 2000 });
+
+  // Load execution history when flow changes (Cache → Frontend → Backend)
+  useEffect(() => {
+    if (!currentFlowId) {
+      // No flow loaded - clear history
+      setExecutionHistory([]);
+      return;
+    }
+
+    async function loadHistory() {
+      try {
+        console.log(`[App] Loading execution history for flow ${currentFlowId}`);
+
+        // Priority 1: Try frontend IndexedDB cache
+        const frontendHistory = await loadExecutionHistory(currentFlowId, 10);
+
+        if (frontendHistory.length > 0) {
+          console.log(`[App] Loaded ${frontendHistory.length} executions from IndexedDB`);
+          setExecutionHistory(frontendHistory);
+          return;
+        }
+
+        console.log('[App] No frontend cache - trying backend API');
+
+        // Priority 2: Fallback to backend API
+        const backendHistory = await fetchExecutionHistory(currentFlowId, 10);
+
+        if (backendHistory.length > 0) {
+          console.log(`[App] Loaded ${backendHistory.length} executions from backend`);
+
+          // Convert backend format to frontend ExecutionHistory format
+          const convertedHistory: ExecutionHistory[] = backendHistory.map((exec: ExecutionHistoryItem) => {
+            // Convert results array to Map
+            const resultsMap = new Map<string, ExecutionResult>();
+            exec.results.forEach(result => {
+              resultsMap.set(result.nodeId, result);
+            });
+
+            // Determine status based on backend status
+            let historyStatus: 'success' | 'error' | 'partial';
+            if (exec.status === 'completed') {
+              const hasErrors = exec.results.some(r => r.error);
+              historyStatus = hasErrors ? 'partial' : 'success';
+            } else if (exec.status === 'failed') {
+              historyStatus = 'error';
+            } else {
+              historyStatus = 'partial';
+            }
+
+            return {
+              id: exec.id,
+              timestamp: exec.startedAt,
+              results: resultsMap,
+              status: historyStatus,
+              traceId: exec.parentTraceId,
+              flowName: exec.flowName,
+            };
+          });
+
+          setExecutionHistory(convertedHistory);
+          return;
+        }
+
+        console.log('[App] No execution history found for this flow');
+      } catch (error) {
+        console.error('[App] Failed to load execution history:', error);
+        // Don't show error to user - just log it
+        // Execution history is not critical for app functionality
+      }
+    }
+
+    loadHistory();
+  }, [currentFlowId]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -139,6 +215,21 @@ function AppContent() {
           code: '// JavaScript code here\nconst result = "Hello from JavaScript";\nreturn result;',
           outputVariable: 'result',
         };
+      } else if (type === 'tool-augmented-llm') {
+        defaultData = {
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: 0.7,
+          maxTokens: 4000,
+          systemPrompt: 'You are a helpful assistant with access to tools.',
+          userPrompt: '',
+          toolsEnabled: true,
+          enabledTools: [],
+          toolConfigs: {},
+          maxToolCalls: 5,
+          toolBarCollapsed: false,
+          statusPanelCollapsed: false,
+        };
       }
 
       const newNode = {
@@ -163,21 +254,63 @@ function AppContent() {
     setCurrentExecution(null);
 
     try {
-      const results = await executeFlow(nodes, edges, inputVariables, {
-        flowId: currentFlowId || undefined,
-        flowName: currentFlowName,
-        flowVersion: '1.0.0', // TODO: Get from flow metadata
-        trackExecution: true, // Enable execution tracking
+      // Use new unified parent trace execution
+      const { executionId, traceId, results } = await executeFlowWithTrace(
+        nodes,
+        edges,
+        inputVariables
+      );
+
+      console.log('[App] Flow execution completed:', {
+        executionId,
+        traceId,
+        nodeCount: results.size,
       });
+
+      // Update current execution display (NEW REQUIREMENT: persist until manually changed)
       setCurrentExecution(results);
 
-      // Add to history
-      const hasErrors = Array.from(results.values()).some(r => r.error);
+      // Store execution results in flow store for Notes nodes to access
+      useFlowStore.getState().setExecutionResults(results);
+
+      // Calculate status
+      const resultsArray = Array.from(results.values());
+      const hasErrors = resultsArray.some(r => r.error);
+      const status = hasErrors ? 'failed' : 'completed';
+
+      // Save to backend database (best effort - don't fail if this errors)
+      if (currentFlowId) {
+        await completeBackendExecution(
+          executionId,
+          resultsArray,
+          status,
+          traceId,
+          hasErrors ? resultsArray.find(r => r.error)?.error : undefined,
+          currentFlowId,
+          currentFlowName || 'Untitled Flow',
+          '1.0.0'
+        );
+
+        // Save to IndexedDB (local persistence)
+        await saveExecutionWithTrace(
+          executionId,
+          resultsArray,
+          traceId,
+          {
+            status,
+            error: hasErrors ? resultsArray.find(r => r.error)?.error : undefined
+          }
+        );
+      }
+
+      // Add to React state history (immediate UI update)
       const newHistory: ExecutionHistory = {
-        id: `exec-${Date.now()}`,
+        id: executionId,
         timestamp: new Date().toISOString(),
         results,
         status: hasErrors ? 'error' : 'success',
+        traceId, // Store parent trace ID for "View Trace" button
+        flowName: currentFlowName || 'Untitled Flow',
       };
       setExecutionHistory([newHistory, ...executionHistory].slice(0, 10)); // Keep last 10
 
@@ -186,7 +319,7 @@ function AppContent() {
     } finally {
       setIsExecuting(false);
     }
-  }, [nodes, edges, executionHistory, currentFlowId, currentFlowName]);
+  }, [nodes, edges, currentFlowId, executionHistory]);
 
   return (
     <div ref={reactFlowWrapper} style={{ width: '100vw', height: '100vh' }}>
@@ -248,11 +381,13 @@ function AppContent() {
   );
 }
 
-// Wrap AppContent with ReactFlowProvider
+// Wrap AppContent with ReactFlowProvider and TraceCacheProvider
 function App() {
   return (
     <ReactFlowProvider>
-      <AppContent />
+      <TraceCacheProvider>
+        <AppContent />
+      </TraceCacheProvider>
     </ReactFlowProvider>
   );
 }

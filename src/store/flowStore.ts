@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Node, Edge } from '@xyflow/react';
+import type { ExecutionResult } from '../utils/executionEngine';
 
 export interface SavedFlow {
   id: string;
@@ -16,6 +17,7 @@ interface FlowState {
   edges: Edge[];
   currentFlowId: string | null;
   savedFlows: SavedFlow[];
+  executionResults: Map<string, ExecutionResult> | null; // Store latest execution results
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   updateNodeData: (nodeId: string, data: Partial<any>) => void;
@@ -27,6 +29,7 @@ interface FlowState {
   loadFlow: (flowId: string) => void;
   deleteFlow: (flowId: string) => void;
   clearCanvas: () => void;
+  setExecutionResults: (results: Map<string, ExecutionResult> | null) => void;
 }
 
 export const useFlowStore = create<FlowState>()(
@@ -49,6 +52,7 @@ export const useFlowStore = create<FlowState>()(
       edges: [],
       currentFlowId: null,
       savedFlows: [],
+      executionResults: null,
 
       setNodes: (nodes) => set({ nodes }),
 
@@ -107,6 +111,7 @@ export const useFlowStore = create<FlowState>()(
                   }
                 : flow
             ),
+            currentFlowId: flowId, // Ensure currentFlowId is set on update too
           }));
         } else {
           // Create new flow
@@ -149,7 +154,12 @@ export const useFlowStore = create<FlowState>()(
           nodes: [],
           edges: [],
           currentFlowId: null,
+          executionResults: null,
         });
+      },
+
+      setExecutionResults: (results) => {
+        set({ executionResults: results });
       },
     }),
     {
