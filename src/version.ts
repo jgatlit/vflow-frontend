@@ -5,7 +5,7 @@
  * XX = Sequential commit number (01, 02, 03, etc.)
  */
 
-export const VERSION = 'v1.03';
+export const VERSION = 'v1.04';
 export const APP_NAME = 'vFlow';
 export const AUTHOR = 'aiChemist';
 

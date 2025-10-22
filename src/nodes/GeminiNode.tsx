@@ -5,6 +5,9 @@ import { useFlowStore } from '../store/flowStore';
 import VariableTextarea from '../components/VariableTextarea';
 import { supportsStructuredOutput } from '../config/modelCapabilities';
 import { csvFieldsToJsonSchema, jsonSchemaToCSVFields, jsonSchemaToMarkdown, csvFieldsToMarkdown } from '../utils/formatConversion';
+import { ToolSelector } from '../components/tools/ToolSelector';
+import { ToolConfigModal } from '../components/tools/ToolConfigModal';
+import { AVAILABLE_TOOLS } from '../config/tools';
 
 export interface GeminiNodeData {
   title?: string;
@@ -21,6 +24,15 @@ export interface GeminiNodeData {
   outputFormat?: 'text' | 'json' | 'csv';
   jsonSchema?: string;  // JSON schema as string
   csvFields?: string;   // Comma-separated field names
+  // Tool support
+  toolsEnabled?: boolean;
+  enabledTools?: string[];
+  toolConfigs?: Record<string, any>;
+  // Agent mode
+  agentMode?: boolean;
+  maxSteps?: number;
+  // Bypass toggle
+  bypassed?: boolean;
 }
 
 const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
@@ -28,9 +40,20 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
   const previousOutputFormatRef = useRef<string | undefined>(nodeData.outputFormat);
   const [copied, setCopied] = useState(false);
+  const [showToolSelector, setShowToolSelector] = useState(false);
+  const [configuringTool, setConfiguringTool] = useState<string | null>(null);
 
   const handleDataChange = (field: keyof GeminiNodeData, value: string | number | boolean) => {
     updateNodeData(id, { [field]: value });
+  };
+
+  const handleToolToggle = (toolId: string) => {
+    const isEnabled = (nodeData.enabledTools || []).includes(toolId);
+    const newEnabledTools = isEnabled
+      ? (nodeData.enabledTools || []).filter(id => id !== toolId)
+      : [...(nodeData.enabledTools || []), toolId];
+
+    updateNodeData(id, { enabledTools: newEnabledTools });
   };
 
   const handleCopyMarkdown = async () => {
@@ -115,7 +138,9 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
         minHeight={350}
         isVisible={selected}
       />
-      <div className="bg-white rounded-lg shadow-lg border-2 border-green-500 p-4">
+      <div className={`bg-white rounded-lg shadow-lg border-2 border-green-500 p-4 ${
+        nodeData.bypassed ? 'opacity-60 ring-2 ring-gray-400' : ''
+      }`}>
         {/* Header with Editable Title */}
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-1">
@@ -128,6 +153,33 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
               placeholder="Node Title"
             />
             <button
+              onClick={() => handleDataChange('bypassed', !nodeData.bypassed)}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                nodeData.bypassed
+                  ? 'bg-gray-400 text-white'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
+              title={nodeData.bypassed ? 'Node is bypassed - click to activate' : 'Node is active - click to bypass'}
+            >
+              {nodeData.bypassed ? '⏸ Bypassed' : '▶ Active'}
+            </button>
+            <button
+              onClick={() => {
+                handleDataChange('toolsEnabled', !nodeData.toolsEnabled);
+                if (nodeData.toolsEnabled) {
+                  handleDataChange('agentMode', false);
+                }
+              }}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                nodeData.toolsEnabled
+                  ? 'bg-teal-100 text-teal-700 hover:bg-teal-200'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title={nodeData.toolsEnabled ? "Disable tools" : "Enable tools"}
+            >
+              {nodeData.toolsEnabled ? '🔧 Tools ON' : '🔧 Add Tools'}
+            </button>
+            <button
               onClick={() => handleDataChange('compactMode', !nodeData.compactMode)}
               className="text-xs px-2 py-1 bg-green-50 hover:bg-green-100 rounded transition-colors"
               title={nodeData.compactMode ? "Show all settings" : "Compact view"}
@@ -137,6 +189,35 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
           </div>
           <div className="text-xs text-gray-500 ml-10">ID: {id}</div>
         </div>
+
+        {/* Tool Bar - Only visible when tools enabled */}
+        {nodeData.toolsEnabled && (
+          <div className="mb-3 p-2 bg-teal-50 rounded border border-teal-200">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-semibold text-teal-800">🔧 Available Tools:</span>
+              <button
+                onClick={() => setShowToolSelector(true)}
+                className="text-xs px-2 py-1 bg-white hover:bg-teal-100 rounded border border-teal-300 transition-colors"
+              >
+                + Select Tools
+              </button>
+            </div>
+            {nodeData.enabledTools && nodeData.enabledTools.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {nodeData.enabledTools.map((toolId) => (
+                  <span
+                    key={toolId}
+                    className="px-2 py-0.5 bg-white rounded text-xs font-mono text-teal-700 border border-teal-200"
+                  >
+                    {toolId}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500 italic">No tools selected</div>
+            )}
+          </div>
+        )}
 
         {/* Conditional: Compact or Full View */}
         {nodeData.compactMode ? (
@@ -403,6 +484,43 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
             {nodeData.model === 'gemini-1.5-flash' && '⚡ 1.5 Flash: $0.075/$0.30 per 1M | 1M context (Deprecated)'}
             {nodeData.model === 'gemini-1.5-flash-8b' && '💨 1.5 Flash-8B: $0.0375/$0.15 per 1M | 1M context (Deprecated)'}
           </div>
+
+          {/* Agent Mode - Only available when tools are enabled */}
+          {nodeData.toolsEnabled && (
+            <div className="border border-purple-200 rounded p-3 bg-purple-50/50 space-y-2 mt-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={nodeData.agentMode || false}
+                  onChange={(e) => handleDataChange('agentMode', e.target.checked)}
+                  className="w-4 h-4"
+                  id={`${id}-agent-mode`}
+                />
+                <label htmlFor={`${id}-agent-mode`} className="text-xs font-semibold text-purple-800">
+                  🤖 Agent Mode (multi-step reasoning)
+                </label>
+              </div>
+
+              {nodeData.agentMode && (
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">
+                    Max Steps
+                  </label>
+                  <input
+                    type="number"
+                    value={nodeData.maxSteps || 5}
+                    onChange={(e) => handleDataChange('maxSteps', parseInt(e.target.value))}
+                    min="1"
+                    max="20"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Agent will perform up to {nodeData.maxSteps || 5} reasoning steps
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           </div>
         )}
       </div>
@@ -419,6 +537,37 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
         className="!w-4 !h-4 !bg-green-500 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all"
         style={{ zIndex: 10 }}
       />
+
+      {/* Tool Selector Modal */}
+      {showToolSelector && (
+        <ToolSelector
+          availableTools={AVAILABLE_TOOLS}
+          selectedToolIds={nodeData.enabledTools || []}
+          onToggle={handleToolToggle}
+          onConfigure={(toolId) => {
+            setShowToolSelector(false);
+            setConfiguringTool(toolId);
+          }}
+          onClose={() => setShowToolSelector(false)}
+        />
+      )}
+
+      {/* Tool Config Modal */}
+      {configuringTool && (
+        <ToolConfigModal
+          tool={AVAILABLE_TOOLS.find(t => t.id === configuringTool)!}
+          existingConfig={nodeData.toolConfigs?.[configuringTool]}
+          onSave={(config) => {
+            const newToolConfigs = {
+              ...(nodeData.toolConfigs || {}),
+              [configuringTool]: config
+            };
+            updateNodeData(id, { toolConfigs: newToolConfigs });
+            setConfiguringTool(null);
+          }}
+          onClose={() => setConfiguringTool(null)}
+        />
+      )}
     </>
   );
 });

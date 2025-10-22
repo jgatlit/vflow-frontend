@@ -108,6 +108,9 @@ export interface Execution {
   cacheHits?: number; // Number of cache hits
   cacheMisses?: number; // Number of cache misses
 
+  // Trace Information
+  traceId?: string; // LangSmith parent trace ID for unified flow execution
+
   // Error Tracking
   error?: string; // Error message if failed
   errorStack?: string; // Stack trace for debugging
@@ -877,4 +880,104 @@ export async function accessFlow(flowId: string): Promise<void> {
   if (flow) {
     saveLastOpenedFlow(flowId, flow.name);
   }
+}
+
+// ===== EXECUTION HISTORY PERSISTENCE =====
+
+/**
+ * Save execution with traceId for history persistence
+ * Creates execution if doesn't exist, then updates with results and trace
+ */
+export async function saveExecutionWithTrace(
+  id: string,
+  results: ExecutionResult[],
+  traceId: string | undefined,
+  options?: {
+    status?: 'completed' | 'failed' | 'cancelled';
+    error?: string;
+    errorStack?: string;
+    errorType?: string;
+    failedNodeId?: string;
+    output?: any;
+    logs?: string[];
+    warnings?: string[];
+  }
+): Promise<void> {
+  // Check if execution exists
+  const existing = await db.executions.get(id);
+
+  if (!existing) {
+    // Create execution if it doesn't exist (handles case where executeFlow didn't create it)
+    const currentFlow = await db.flows.orderBy('updatedAt').last();
+    const now = new Date().toISOString();
+
+    await db.executions.add({
+      id,
+      flowId: currentFlow?.id || 'unknown',
+      flowName: currentFlow?.name || 'Untitled Flow',
+      flowVersion: currentFlow?.version || '1.0.0',
+      status: options?.status || 'completed',
+      startedAt: now,
+      completedAt: now,
+      duration: 0,
+      results,
+      traceId,
+    });
+  } else {
+    // Update existing execution
+    await completeExecutionWithMetadata(id, results, options);
+
+    // Update with traceId
+    if (traceId) {
+      await db.executions.update(id, { traceId });
+    }
+  }
+}
+
+/**
+ * Load execution history for a flow
+ * Converts Execution records to ExecutionHistory format
+ * Returns most recent N executions
+ */
+export async function loadExecutionHistory(
+  flowId: string,
+  limit: number = 10
+): Promise<Array<{
+  id: string;
+  timestamp: string;
+  results: Map<string, ExecutionResult>;
+  status: 'success' | 'error' | 'partial';
+  traceId?: string;
+  flowName?: string;
+}>> {
+  const executions = await getFlowExecutions(flowId, limit);
+
+  return executions.map(execution => {
+    // Convert ExecutionResult[] to Map<string, ExecutionResult>
+    const resultsMap = new Map<string, ExecutionResult>();
+    execution.results.forEach(result => {
+      resultsMap.set(result.nodeId, result);
+    });
+
+    // Map execution status to ExecutionHistory status
+    let historyStatus: 'success' | 'error' | 'partial';
+    if (execution.status === 'completed') {
+      // Check if any node had errors
+      const hasErrors = execution.results.some(r => r.error);
+      historyStatus = hasErrors ? 'partial' : 'success';
+    } else if (execution.status === 'failed') {
+      historyStatus = 'error';
+    } else {
+      historyStatus = 'partial'; // running or cancelled
+    }
+
+    return {
+      id: execution.id,
+      timestamp: execution.startedAt,
+      results: resultsMap,
+      status: historyStatus,
+      traceId: execution.traceId,
+      flowName: execution.flowName
+    };
+  });
 }

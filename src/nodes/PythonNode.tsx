@@ -8,6 +8,7 @@ interface PythonNodeData {
   code: string;
   inputVariables?: string[];
   outputVariable?: string;
+  bypassed?: boolean;
 }
 
 function PythonNode({ id, data, selected }: NodeProps) {
@@ -19,7 +20,9 @@ function PythonNode({ id, data, selected }: NodeProps) {
   };
 
   return (
-    <div className="bg-white border-2 border-purple-500 rounded-lg shadow-lg min-w-[350px]">
+    <div className={`bg-white border-2 border-purple-500 rounded-lg shadow-lg min-w-[350px] ${
+      nodeData.bypassed ? 'opacity-60 ring-2 ring-gray-400' : ''
+    }`}>
       <NodeResizer
         minWidth={350}
         minHeight={200}
@@ -49,6 +52,17 @@ function PythonNode({ id, data, selected }: NodeProps) {
                 placeholder="Node Title"
               />
             </div>
+            <button
+              onClick={() => handleDataChange('bypassed', !nodeData.bypassed)}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                nodeData.bypassed
+                  ? 'bg-gray-400 text-white'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
+              title={nodeData.bypassed ? 'Node is bypassed - click to activate' : 'Node is active - click to bypass'}
+            >
+              {nodeData.bypassed ? '⏸ Bypassed' : '▶ Active'}
+            </button>
             <span className="text-xs text-gray-500 bg-purple-50 px-2 py-1 rounded">
               Pyodide
             </span>

@@ -3,6 +3,7 @@ import { Rnd } from 'react-rnd';
 import ReactMarkdown from 'react-markdown';
 import { useFlowStore } from '../store/flowStore';
 import type { ExecutionResult } from '../utils/executionEngine';
+import { TraceViewerModal } from './TraceViewer/TraceViewerModal';
 
 /**
  * Get default color for node type
@@ -53,6 +54,8 @@ export interface ExecutionHistory {
   timestamp: string;
   results: Map<string, ExecutionResult>;
   status: 'success' | 'error' | 'partial';
+  traceId?: string;  // Parent trace ID for unified flow execution
+  flowName?: string; // Flow name for display in history
 }
 
 interface ExecutionPanelProps {
@@ -77,6 +80,8 @@ const ExecutionPanel = ({
   const [showInputDialog, setShowInputDialog] = useState(false);
   const [resultsViewMode, setResultsViewMode] = useState<'markdown' | 'raw'>('markdown');
   const [copyAllSuccess, setCopyAllSuccess] = useState(false);
+  const [showTraceViewer, setShowTraceViewer] = useState(false);
+  const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
 
   // Panel position and size state with localStorage persistence
   const [panelPosition, setPanelPosition] = useState(() => {
@@ -241,6 +246,32 @@ const ExecutionPanel = ({
                 <h3 className="font-semibold text-gray-800">Execution Results</h3>
               </div>
               <div className="flex items-center gap-2">
+                {/* View Trace button - shows parent trace (unified) or most recent node trace */}
+                {(() => {
+                  // Check for parent trace ID in execution history (unified flow execution)
+                  const parentTraceId = executionHistory[0]?.traceId;
+
+                  // Fallback to individual node trace IDs (backward compatibility)
+                  const nodeTraceId = Array.from(currentExecution.entries())
+                    .map(([_, result]) => result.traceId)
+                    .filter(Boolean)
+                    .pop();
+
+                  const traceId = parentTraceId || nodeTraceId;
+
+                  return traceId ? (
+                    <button
+                      onClick={() => {
+                        setSelectedTraceId(traceId);
+                        setShowTraceViewer(true);
+                      }}
+                      className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors duration-150"
+                      title="View execution trace"
+                    >
+                      🔍 View Trace
+                    </button>
+                  ) : null;
+                })()}
                 <button
                   onClick={copyAllToClipboard}
                   className={`text-xs px-2 py-1 rounded border ${
@@ -433,6 +464,11 @@ const ExecutionPanel = ({
                       {new Date(exec.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
+                  {exec.flowName && (
+                    <div className="text-xs font-medium text-gray-700 mb-1">
+                      {exec.flowName}
+                    </div>
+                  )}
                   <div className="text-xs text-gray-600">
                     {exec.results.size} nodes executed
                   </div>
@@ -441,6 +477,17 @@ const ExecutionPanel = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* Trace Viewer Modal */}
+      {showTraceViewer && selectedTraceId && (
+        <TraceViewerModal
+          traceId={selectedTraceId}
+          onClose={() => {
+            setShowTraceViewer(false);
+            setSelectedTraceId(null);
+          }}
+        />
       )}
     </>
   );

@@ -1,6 +1,8 @@
 import type { Node, Edge } from '@xyflow/react';
 import { topologicalSort, substituteVariables, type ExecutionContext, type ExecutionResult } from '../utils/executionEngine';
 import { executePython, executeJavaScript } from './codeExecutionService';
+import { WebhookService } from './webhookService';
+import type { WebhookOutNodeData } from '../types/webhook';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -430,6 +432,25 @@ export async function executeFlow(
         context,
         node.id,
         (node.data as any).outputVariable || 'result'
+      );
+    } else if (node.type === 'webhook-in') {
+      // Webhook inbound nodes are triggered externally
+      // During normal flow execution, we skip them or use cached payload
+      result = {
+        nodeId: node.id,
+        output: context.variables['webhook-payload'] || '{}',
+        executedAt: new Date().toISOString(),
+        metadata: {
+          nodeType: 'webhook-in',
+          outputVariable: (node.data as any).outputVariable || node.id,
+        },
+      };
+    } else if (node.type === 'webhook-out') {
+      // Execute outbound webhook
+      result = await WebhookService.executeOutboundWebhook(
+        node.data as WebhookOutNodeData,
+        context,
+        node.id
       );
     } else {
       // Execute LLM node

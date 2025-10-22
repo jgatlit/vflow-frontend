@@ -5,6 +5,10 @@ import { useFlowStore } from '../store/flowStore';
 import VariableTextarea from '../components/VariableTextarea';
 import { supportsStructuredOutput } from '../config/modelCapabilities';
 import { csvFieldsToJsonSchema, jsonSchemaToCSVFields, jsonSchemaToMarkdown, csvFieldsToMarkdown } from '../utils/formatConversion';
+import { ToolSelector } from '../components/tools/ToolSelector';
+import { ToolConfigModal } from '../components/tools/ToolConfigModal';
+import { AVAILABLE_TOOLS } from '../config/tools';
+import { supportsTools } from '../config/models';
 
 export interface AnthropicNodeData {
   title?: string;
@@ -21,6 +25,18 @@ export interface AnthropicNodeData {
   outputFormat?: 'text' | 'json' | 'csv';
   jsonSchema?: string;  // JSON schema as string
   csvFields?: string;   // Comma-separated field names
+
+  // NEW: Tool support
+  toolsEnabled?: boolean;
+  enabledTools?: string[];
+  toolConfigs?: Record<string, any>;
+
+  // NEW: Agent mode support
+  agentMode?: boolean;
+  maxSteps?: number;
+
+  // Bypass toggle
+  bypassed?: boolean;
 }
 
 const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
@@ -28,9 +44,29 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
   const previousOutputFormatRef = useRef<string | undefined>(nodeData.outputFormat);
   const [copied, setCopied] = useState(false);
+  const [showToolSelector, setShowToolSelector] = useState(false);
+  const [configuringTool, setConfiguringTool] = useState<string | null>(null);
 
   const handleDataChange = (field: keyof AnthropicNodeData, value: string | number | boolean) => {
     updateNodeData(id, { [field]: value });
+  };
+
+  const toggleTools = () => {
+    const newState = !nodeData.toolsEnabled;
+    updateNodeData(id, {
+      toolsEnabled: newState,
+      enabledTools: newState ? (nodeData.enabledTools || []) : undefined,
+      agentMode: newState ? (nodeData.agentMode || false) : undefined,
+    });
+  };
+
+  const handleToolToggle = (toolId: string) => {
+    const isEnabled = (nodeData.enabledTools || []).includes(toolId);
+    const newEnabledTools = isEnabled
+      ? (nodeData.enabledTools || []).filter(id => id !== toolId)
+      : [...(nodeData.enabledTools || []), toolId];
+
+    updateNodeData(id, { enabledTools: newEnabledTools });
   };
 
   const handleCopyMarkdown = async () => {
@@ -127,6 +163,23 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
               className="font-semibold text-lg flex-1 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-purple-300 rounded px-1"
               placeholder="Node Title"
             />
+
+            {/* Tools Toggle Button */}
+            {supportsTools('anthropic', nodeData.model) && (
+              <button
+                onClick={toggleTools}
+                className={`text-xs px-2 py-1 rounded transition-colors ${
+                  nodeData.toolsEnabled
+                    ? 'bg-teal-100 text-teal-700 hover:bg-teal-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title="Enable tools"
+              >
+                {nodeData.toolsEnabled ? '🔧 Tools ON' : '🔧 Add Tools'}
+              </button>
+            )}
+
+            {/* Compact Toggle */}
             <button
               onClick={() => handleDataChange('compactMode', !nodeData.compactMode)}
               className="text-xs px-2 py-1 bg-purple-50 hover:bg-purple-100 rounded transition-colors"
@@ -137,6 +190,40 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
           </div>
           <div className="text-xs text-gray-500 ml-10">ID: {id}</div>
         </div>
+
+        {/* Conditional: Tool Bar */}
+        {nodeData.toolsEnabled && (
+          <div className="mb-3 p-2 bg-teal-50 rounded border border-teal-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-teal-800">
+                Tools ({nodeData.enabledTools?.length || 0})
+              </span>
+              <button
+                onClick={() => setShowToolSelector(true)}
+                className="text-xs px-2 py-1 bg-teal-100 hover:bg-teal-200 text-teal-700 rounded"
+              >
+                Select Tools
+              </button>
+            </div>
+
+            {nodeData.enabledTools && nodeData.enabledTools.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {nodeData.enabledTools.map(toolId => {
+                  const tool = AVAILABLE_TOOLS.find(t => t.id === toolId);
+                  return (
+                    <span
+                      key={toolId}
+                      className="px-2 py-0.5 bg-white text-teal-700 text-xs rounded border border-teal-300 flex items-center gap-1"
+                    >
+                      <span>{tool?.icon || '🔧'}</span>
+                      <span>{tool?.displayName || toolId}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Conditional: Compact or Full View */}
         {nodeData.compactMode ? (
@@ -257,6 +344,34 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
                 Extended Thinking Mode (uses thinking budget)
               </label>
             </div>
+
+            {/* Agent Mode Toggle (if tools enabled) */}
+            {nodeData.toolsEnabled && (
+              <div className="flex items-center gap-2 p-2 bg-teal-50 rounded border border-teal-200">
+                <input
+                  type="checkbox"
+                  checked={nodeData.agentMode || false}
+                  onChange={(e) => handleDataChange('agentMode', e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <label className="text-xs font-medium text-gray-700 flex-1">
+                  Agent Mode (multi-step tool reasoning)
+                </label>
+                {nodeData.agentMode && (
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-600">Max steps:</label>
+                    <input
+                      type="number"
+                      value={nodeData.maxSteps || 5}
+                      onChange={(e) => handleDataChange('maxSteps', parseInt(e.target.value))}
+                      min="1"
+                      max="20"
+                      className="w-16 text-xs border border-gray-300 rounded px-1 py-0.5"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* System Prompt */}
             <VariableTextarea
@@ -412,6 +527,37 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
         className="!w-4 !h-4 !bg-purple-500 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all"
         style={{ zIndex: 10 }}
       />
+
+      {/* Tool Selector Modal */}
+      {showToolSelector && (
+        <ToolSelector
+          availableTools={AVAILABLE_TOOLS}
+          selectedToolIds={nodeData.enabledTools || []}
+          onToggle={handleToolToggle}
+          onConfigure={(toolId) => {
+            setShowToolSelector(false);
+            setConfiguringTool(toolId);
+          }}
+          onClose={() => setShowToolSelector(false)}
+        />
+      )}
+
+      {/* Tool Config Modal */}
+      {configuringTool && (
+        <ToolConfigModal
+          tool={AVAILABLE_TOOLS.find(t => t.id === configuringTool)!}
+          existingConfig={nodeData.toolConfigs?.[configuringTool]}
+          onSave={(config) => {
+            const newToolConfigs = {
+              ...(nodeData.toolConfigs || {}),
+              [configuringTool]: config
+            };
+            updateNodeData(id, { toolConfigs: newToolConfigs });
+            setConfiguringTool(null);
+          }}
+          onClose={() => setConfiguringTool(null)}
+        />
+      )}
     </>
   );
 });

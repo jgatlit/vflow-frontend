@@ -5,6 +5,7 @@ export interface ExecutionResult {
   output: string;
   error?: string;
   executedAt: string;
+  traceId?: string;  // LangSmith trace ID for viewing execution details
   metadata?: {
     model?: string;
     tokensUsed?: number;
@@ -25,6 +26,15 @@ export interface ExecutionResult {
       mediaType?: 'video' | 'image' | 'pdf' | 'audio';
       processingTime?: number;
     };
+    // Agent execution metadata
+    steps?: any[];  // Agent reasoning steps
+    executionId?: string;  // Agent execution ID
+    // Webhook execution metadata
+    nodeType?: string;  // Node type for webhook-in
+    statusCode?: number;  // HTTP status code for webhook-out
+    statusText?: string;  // HTTP status text for webhook-out
+    targetUrl?: string;  // Target URL for webhook-out
+    httpMethod?: string;  // HTTP method for webhook-out
   };
 }
 

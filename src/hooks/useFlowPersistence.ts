@@ -178,6 +178,10 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
         isDirty: false,
       }));
 
+      // CRITICAL: Also update Zustand store's currentFlowId so other components can access it
+      const { useFlowStore: FlowStore } = await import('../store/flowStore');
+      FlowStore.setState({ currentFlowId: savedFlow.id });
+
       // Update refs to track saved state
       lastSavedNodesRef.current = JSON.stringify(nodes);
       lastSavedEdgesRef.current = JSON.stringify(edges);
