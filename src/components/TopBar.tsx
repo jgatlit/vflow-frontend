@@ -22,6 +22,7 @@ interface TopBarProps {
   onNewFlow: () => void;
   onImportFlow: (name: string) => void;
   isExecuting: boolean;
+  executionStatus?: string;
   historyCount: number;
   showFlows: boolean;
   flowName: string;
@@ -39,6 +40,7 @@ const TopBar = ({
   onNewFlow,
   onImportFlow,
   isExecuting,
+  executionStatus,
   historyCount,
   showFlows,
   flowName,
@@ -133,7 +135,7 @@ const TopBar = ({
           {isExecuting ? (
             <>
               <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Executing...
+              {executionStatus || 'Executing...'}
             </>
           ) : (
             <>

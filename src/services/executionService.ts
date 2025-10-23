@@ -868,3 +868,154 @@ export async function createBackendExecution(
     return crypto.randomUUID();
   }
 }
+
+/**
+ * Execute flow asynchronously (returns immediately with execution ID)
+ * For flows that may take longer than Cloudflare timeout (100s)
+ */
+export async function executeFlowAsync(
+  nodes: Node[],
+  edges: Edge[],
+  initialVariables: Record<string, string> = {},
+  options?: {
+    flowId?: string;
+    flowName?: string;
+  }
+): Promise<string> {
+  try {
+    console.log('[ExecutionService] Starting async flow execution');
+
+    const response = await fetch(`${API_URL}/api/execute/flow`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nodes: nodes.map(n => ({
+          id: n.id,
+          type: n.type,
+          data: n.data,
+        })),
+        edges: edges.map(e => ({
+          source: e.source,
+          target: e.target,
+        })),
+        variables: initialVariables,
+        flowId: options?.flowId,
+        flowName: options?.flowName,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to start flow execution';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } else {
+          errorMessage = await response.text();
+        }
+      } catch (e) {
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    console.log(`[ExecutionService] Flow execution started: ${data.executionId}`);
+    return data.executionId;
+  } catch (error) {
+    console.error('[ExecutionService] Failed to start async execution:', error);
+    throw error;
+  }
+}
+
+/**
+ * Poll execution status until completion
+ * @param executionId - The execution ID to poll
+ * @param onUpdate - Callback for status updates
+ * @param maxPolls - Maximum number of polls (default: 120 = 4 minutes at 2s intervals)
+ * @returns Execution results
+ */
+export async function pollExecutionStatus(
+  executionId: string,
+  onUpdate?: (status: string, execution?: any) => void,
+  maxPolls: number = 120
+): Promise<any> {
+  let polls = 0;
+
+  console.log(`[ExecutionService] Starting to poll execution: ${executionId}`);
+
+  while (polls < maxPolls) {
+    try {
+      const response = await fetch(`${API_URL}/api/executions/${executionId}`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`[ExecutionService] Execution not found: ${executionId}`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          polls++;
+          continue;
+        }
+        throw new Error(`Failed to fetch execution status: ${response.statusText}`);
+      }
+
+      const execution = await response.json();
+
+      console.log(`[ExecutionService] Poll ${polls + 1}: status=${execution.status}`);
+      onUpdate?.(execution.status, execution);
+
+      if (execution.status === 'completed') {
+        console.log(`[ExecutionService] Execution completed successfully`);
+        return {
+          success: true,
+          results: execution.results,
+          output: execution.output,
+          duration: execution.duration,
+          tokensUsed: execution.tokensUsed,
+          apiCallCount: execution.apiCallCount,
+        };
+      }
+
+      if (execution.status === 'failed') {
+        console.error(`[ExecutionService] Execution failed:`, execution.error);
+        throw new Error(execution.error || 'Execution failed');
+      }
+
+      // Still running, wait 2 seconds and poll again
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      polls++;
+
+    } catch (error) {
+      console.error(`[ExecutionService] Error polling execution:`, error);
+      throw error;
+    }
+  }
+
+  throw new Error(`Execution timeout after ${maxPolls * 2} seconds - check execution history for results`);
+}
+
+/**
+ * Execute flow with async pattern (wrapper that handles both start and polling)
+ * @returns Execution results (waits for completion)
+ */
+export async function executeFlowAsyncWithPolling(
+  nodes: Node[],
+  edges: Edge[],
+  initialVariables: Record<string, string> = {},
+  options?: {
+    flowId?: string;
+    flowName?: string;
+    onStatusUpdate?: (status: string, execution?: any) => void;
+  }
+): Promise<any> {
+  // Start execution
+  const executionId = await executeFlowAsync(nodes, edges, initialVariables, {
+    flowId: options?.flowId,
+    flowName: options?.flowName,
+  });
+
+  // Poll for results
+  return pollExecutionStatus(executionId, options?.onStatusUpdate);
+}

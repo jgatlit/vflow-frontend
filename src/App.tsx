@@ -9,7 +9,7 @@ import TopBar from './components/TopBar';
 import FlowListSidebar from './components/FlowListSidebar';
 import ExecutionPanel, { type ExecutionHistory } from './components/ExecutionPanel';
 import VersionDisplay from './components/VersionDisplay';
-import { executeFlow, executeFlowWithTrace } from './services/executionService';
+import { executeFlow, executeFlowWithTrace, executeFlowAsyncWithPolling } from './services/executionService';
 import type { ExecutionResult } from './utils/executionEngine';
 import { useFlowStore } from './store/flowStore';
 import { useFlowPersistence } from './hooks/useFlowPersistence';
@@ -23,6 +23,7 @@ function AppContent() {
   const [showFlows, setShowFlows] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [executionStatus, setExecutionStatus] = useState<string>('');
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>([]);
   const [currentExecution, setCurrentExecution] = useState<Map<string, ExecutionResult> | null>(null);
 
@@ -252,74 +253,64 @@ function AppContent() {
 
     setIsExecuting(true);
     setCurrentExecution(null);
+    setExecutionStatus('Starting execution...');
 
     try {
-      // Use new unified parent trace execution
-      const { executionId, traceId, results } = await executeFlowWithTrace(
+      // Use async execution with polling (solves Cloudflare 524 timeout)
+      const result = await executeFlowAsyncWithPolling(
         nodes,
         edges,
-        inputVariables
+        inputVariables,
+        {
+          flowId: currentFlowId,
+          flowName: currentFlowName,
+          onStatusUpdate: (status, execution) => {
+            // Update status display for user
+            if (status === 'running') {
+              setExecutionStatus('Executing workflow...');
+            } else if (status === 'completed') {
+              setExecutionStatus('Completed!');
+            } else if (status === 'failed') {
+              setExecutionStatus('Failed');
+            }
+          },
+        }
       );
 
-      console.log('[App] Flow execution completed:', {
-        executionId,
-        traceId,
-        nodeCount: results.size,
-      });
+      console.log('[App] Async flow execution completed');
 
-      // Update current execution display (NEW REQUIREMENT: persist until manually changed)
-      setCurrentExecution(results);
+      // Convert results to Map for compatibility with existing code
+      const resultsMap = new Map<string, ExecutionResult>();
+      if (result.results) {
+        Object.entries(result.results).forEach(([nodeId, nodeResult]: [string, any]) => {
+          resultsMap.set(nodeId, nodeResult as ExecutionResult);
+        });
+      }
+
+      // Update current execution display
+      setCurrentExecution(resultsMap);
 
       // Store execution results in flow store for Notes nodes to access
-      useFlowStore.getState().setExecutionResults(results);
-
-      // Calculate status
-      const resultsArray = Array.from(results.values());
-      const hasErrors = resultsArray.some(r => r.error);
-      const status = hasErrors ? 'failed' : 'completed';
-
-      // Save to backend database (best effort - don't fail if this errors)
-      if (currentFlowId) {
-        await completeBackendExecution(
-          executionId,
-          resultsArray,
-          status,
-          traceId,
-          hasErrors ? resultsArray.find(r => r.error)?.error : undefined,
-          currentFlowId,
-          currentFlowName || 'Untitled Flow',
-          '1.0.0'
-        );
-
-        // Save to IndexedDB (local persistence)
-        await saveExecutionWithTrace(
-          executionId,
-          resultsArray,
-          traceId,
-          {
-            status,
-            error: hasErrors ? resultsArray.find(r => r.error)?.error : undefined
-          }
-        );
-      }
+      useFlowStore.getState().setExecutionResults(resultsMap);
 
       // Add to React state history (immediate UI update)
       const newHistory: ExecutionHistory = {
-        id: executionId,
+        id: crypto.randomUUID(),
         timestamp: new Date().toISOString(),
-        results,
-        status: hasErrors ? 'error' : 'success',
-        traceId, // Store parent trace ID for "View Trace" button
+        results: resultsMap,
+        status: result.success ? 'success' : 'error',
         flowName: currentFlowName || 'Untitled Flow',
       };
       setExecutionHistory([newHistory, ...executionHistory].slice(0, 10)); // Keep last 10
 
     } catch (error: any) {
+      console.error('[App] Execution failed:', error);
       alert(`Execution failed: ${error.message}`);
+      setExecutionStatus('Failed');
     } finally {
       setIsExecuting(false);
     }
-  }, [nodes, edges, currentFlowId, executionHistory]);
+  }, [nodes, edges, currentFlowId, currentFlowName, executionHistory]);
 
   return (
     <div ref={reactFlowWrapper} style={{ width: '100vw', height: '100vh' }}>
@@ -331,6 +322,7 @@ function AppContent() {
         onNewFlow={newFlow}
         onImportFlow={importFlow}
         isExecuting={isExecuting}
+        executionStatus={executionStatus}
         historyCount={executionHistory.length}
         showFlows={showFlows}
         flowName={currentFlowName}
