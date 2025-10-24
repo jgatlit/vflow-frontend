@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Rnd } from 'react-rnd';
 import ReactMarkdown from 'react-markdown';
+import { Eye } from 'lucide-react';
 import { useFlowStore } from '../store/flowStore';
 import type { ExecutionResult } from '../utils/executionEngine';
 import { TraceViewerModal } from './TraceViewer/TraceViewerModal';
+import { ContentViewModal } from './ContentView';
+import { detectContentFormat } from '../utils/contentDetection';
+import type { ContentFormat } from '../types/contentView';
 
 /**
  * Get default color for node type
@@ -83,6 +87,12 @@ const ExecutionPanel = ({
   const [showTraceViewer, setShowTraceViewer] = useState(false);
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
 
+  // Content viewer modal state
+  const [showContentViewer, setShowContentViewer] = useState(false);
+  const [selectedContent, setSelectedContent] = useState<string>('');
+  const [selectedFormat, setSelectedFormat] = useState<ContentFormat>('markdown');
+  const [selectedTitle, setSelectedTitle] = useState<string>('');
+
   // Panel position and size state with localStorage persistence
   const [panelPosition, setPanelPosition] = useState(() => {
     const saved = localStorage.getItem('executionPanelPosition');
@@ -118,6 +128,16 @@ const ExecutionPanel = ({
   };
 
   const nodes = useFlowStore((state) => state.nodes);
+
+  /**
+   * Open content viewer modal
+   */
+  const openContentViewer = (content: string, format: ContentFormat, title: string) => {
+    setSelectedContent(content);
+    setSelectedFormat(format);
+    setSelectedTitle(title);
+    setShowContentViewer(true);
+  };
 
   /**
    * Copy all execution results to clipboard in markdown format
@@ -333,8 +353,11 @@ const ExecutionPanel = ({
               const nodeType = node?.type?.toUpperCase() || 'UNKNOWN';
               const nodeColor = node?.style?.backgroundColor || getNodeTypeColor(node?.type);
 
+              // Detect content format for VIEW button
+              const detectedFormat = !result.error ? detectContentFormat(result.output) : null;
+
               return (
-                <div key={nodeId} className={`p-3 rounded-lg border ${result.error ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
+                <div key={nodeId} className={`p-3 rounded-lg border ${result.error ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'} relative`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span
@@ -362,6 +385,20 @@ const ExecutionPanel = ({
                     <div className="flex items-center gap-2">
                       {!result.error && (
                         <>
+                          {detectedFormat && (
+                            <button
+                              onClick={() => openContentViewer(
+                                result.output,
+                                detectedFormat.format,
+                                `${nodeLabel} - ${nodeType}`
+                              )}
+                              className="flex items-center gap-1 text-xs px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors font-medium"
+                              title={`View as ${detectedFormat.format.toUpperCase()} (${detectedFormat.confidence}% confidence)`}
+                            >
+                              <Eye className="w-3 h-3" />
+                              VIEW
+                            </button>
+                          )}
                           <button
                             onClick={copyToClipboard}
                             className="text-xs px-2 py-1 bg-white rounded hover:bg-gray-100 transition-colors"
@@ -487,6 +524,17 @@ const ExecutionPanel = ({
             setShowTraceViewer(false);
             setSelectedTraceId(null);
           }}
+        />
+      )}
+
+      {/* Content Viewer Modal */}
+      {showContentViewer && selectedContent && selectedFormat && (
+        <ContentViewModal
+          isOpen={showContentViewer}
+          onClose={() => setShowContentViewer(false)}
+          content={selectedContent}
+          format={selectedFormat}
+          title={selectedTitle}
         />
       )}
     </>

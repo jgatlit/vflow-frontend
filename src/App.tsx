@@ -9,6 +9,7 @@ import TopBar from './components/TopBar';
 import FlowListSidebar from './components/FlowListSidebar';
 import ExecutionPanel, { type ExecutionHistory } from './components/ExecutionPanel';
 import VersionDisplay from './components/VersionDisplay';
+import RateLimitAlert from './components/RateLimitAlert';
 import { executeFlow, executeFlowWithTrace, executeFlowAsyncWithPolling } from './services/executionService';
 import type { ExecutionResult } from './utils/executionEngine';
 import { useFlowStore } from './store/flowStore';
@@ -26,6 +27,7 @@ function AppContent() {
   const [executionStatus, setExecutionStatus] = useState<string>('');
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>([]);
   const [currentExecution, setCurrentExecution] = useState<Map<string, ExecutionResult> | null>(null);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{ retryAfter: number } | null>(null);
 
   const nodes = useFlowStore((state) => state.nodes);
   const edges = useFlowStore((state) => state.edges);
@@ -78,18 +80,33 @@ function AppContent() {
 
           // Convert backend format to frontend ExecutionHistory format
           const convertedHistory: ExecutionHistory[] = backendHistory.map((exec: ExecutionHistoryItem) => {
-            // Convert results array to Map
+            // Convert results to Map (handle both object and array formats)
             const resultsMap = new Map<string, ExecutionResult>();
-            exec.results.forEach(result => {
-              resultsMap.set(result.nodeId, result);
-            });
+
+            if (exec.results) {
+              if (Array.isArray(exec.results)) {
+                // Array format: [{ nodeId: "1", ... }]
+                exec.results.forEach(result => {
+                  resultsMap.set(result.nodeId, result);
+                });
+              } else if (typeof exec.results === 'object') {
+                // Object format: { "1": { nodeId: "1", ... } }
+                Object.entries(exec.results).forEach(([nodeId, result]) => {
+                  resultsMap.set(nodeId, result as ExecutionResult);
+                });
+              }
+            }
 
             // Determine status based on backend status
             let historyStatus: 'success' | 'error' | 'partial';
             if (exec.status === 'completed') {
-              const hasErrors = exec.results.some(r => r.error);
+              const hasErrors = exec.results && (
+                Array.isArray(exec.results)
+                  ? exec.results.some(r => r.error)
+                  : Object.values(exec.results).some((r: any) => r.error)
+              );
               historyStatus = hasErrors ? 'partial' : 'success';
-            } else if (exec.status === 'failed') {
+            } else if (exec.status === 'failed' || exec.status === 'rate_limited') {
               historyStatus = 'error';
             } else {
               historyStatus = 'partial';
@@ -254,6 +271,7 @@ function AppContent() {
     setIsExecuting(true);
     setCurrentExecution(null);
     setExecutionStatus('Starting execution...');
+    setRateLimitInfo(null); // Clear any previous rate limit info
 
     try {
       // Use async execution with polling (solves Cloudflare 524 timeout)
@@ -268,10 +286,17 @@ function AppContent() {
             // Update status display for user
             if (status === 'running') {
               setExecutionStatus('Executing workflow...');
+              setRateLimitInfo(null); // Clear rate limit when execution resumes
+            } else if (status === 'rate_limited') {
+              // Rate limit detected - show alert
+              setExecutionStatus('Rate limit queue...');
+              setRateLimitInfo({ retryAfter: execution?.retryAfter || 60 });
             } else if (status === 'completed') {
               setExecutionStatus('Completed!');
+              setRateLimitInfo(null);
             } else if (status === 'failed') {
               setExecutionStatus('Failed');
+              setRateLimitInfo(null);
             }
           },
         }
@@ -307,6 +332,7 @@ function AppContent() {
       console.error('[App] Execution failed:', error);
       alert(`Execution failed: ${error.message}`);
       setExecutionStatus('Failed');
+      setRateLimitInfo(null);
     } finally {
       setIsExecuting(false);
     }
@@ -314,6 +340,18 @@ function AppContent() {
 
   return (
     <div ref={reactFlowWrapper} style={{ width: '100vw', height: '100vh' }}>
+      {/* Rate Limit Alert - Show when rate limited */}
+      {rateLimitInfo && (
+        <RateLimitAlert
+          retryAfter={rateLimitInfo.retryAfter}
+          onRetry={() => {
+            console.log('[App] Rate limit retry period elapsed');
+            setRateLimitInfo(null);
+          }}
+          onDismiss={() => setRateLimitInfo(null)}
+        />
+      )}
+
       <TopBar
         onHistoryClick={() => setShowHistory(!showHistory)}
         onFlowsToggle={() => setShowFlows(!showFlows)}

@@ -932,16 +932,49 @@ export async function executeFlowAsync(
 }
 
 /**
+ * Parse rate limit information from error message or response
+ * @param error - Error object or execution data
+ * @returns Rate limit info if detected, null otherwise
+ */
+function parseRateLimitInfo(error: any): { retryAfter: number } | null {
+  // Check if this is an execution object with retryAfter timestamp
+  if (error?.retryAfter) {
+    // retryAfter is a DateTime string from the API (e.g., "2025-10-23T23:28:00.889Z")
+    const retryTime = new Date(error.retryAfter).getTime();
+    const now = Date.now();
+    const secondsRemaining = Math.max(0, Math.ceil((retryTime - now) / 1000));
+    return { retryAfter: secondsRemaining };
+  }
+
+  // Check for 429 status code
+  if (error?.status === 429 || error?.response?.status === 429) {
+    const retryAfter = error?.response?.retryAfter || 60;
+    return { retryAfter };
+  }
+
+  // Check error message for rate limit indicators
+  const errorMsg = error?.message || error?.error || '';
+  if (errorMsg.includes('rate limit') || errorMsg.includes('RESOURCE_EXHAUSTED') || errorMsg.includes('429')) {
+    // Try to extract retry time from message
+    const retryMatch = errorMsg.match(/retry.*?(\d+)\s*(second|sec|s)/i);
+    const retryAfter = retryMatch ? parseInt(retryMatch[1]) : 60;
+    return { retryAfter };
+  }
+
+  return null;
+}
+
+/**
  * Poll execution status until completion
  * @param executionId - The execution ID to poll
  * @param onUpdate - Callback for status updates
- * @param maxPolls - Maximum number of polls (default: 120 = 4 minutes at 2s intervals)
+ * @param maxPolls - Maximum number of polls (default: 600 = 20 minutes at 2s intervals)
  * @returns Execution results
  */
 export async function pollExecutionStatus(
   executionId: string,
   onUpdate?: (status: string, execution?: any) => void,
-  maxPolls: number = 120
+  maxPolls: number = 600
 ): Promise<any> {
   let polls = 0;
 
@@ -958,12 +991,69 @@ export async function pollExecutionStatus(
           polls++;
           continue;
         }
+
+        // Check for rate limit error (429)
+        if (response.status === 429) {
+          const errorData = await response.json().catch(() => ({}));
+          const rateLimitInfo = parseRateLimitInfo({ status: 429, ...errorData });
+
+          console.warn(`[ExecutionService] Rate limit detected, retry after ${rateLimitInfo?.retryAfter}s`);
+
+          // Notify with rate limit status
+          onUpdate?.('rate_limited', {
+            status: 'rate_limited',
+            retryAfter: rateLimitInfo?.retryAfter || 60
+          });
+
+          // Wait for retry period
+          await new Promise(resolve => setTimeout(resolve, (rateLimitInfo?.retryAfter || 60) * 1000));
+          polls++;
+          continue;
+        }
+
         throw new Error(`Failed to fetch execution status: ${response.statusText}`);
       }
 
       const execution = await response.json();
 
       console.log(`[ExecutionService] Poll ${polls + 1}: status=${execution.status}`);
+
+      // Check if execution status is rate_limited
+      if (execution.status === 'rate_limited') {
+        const rateLimitInfo = parseRateLimitInfo(execution);
+        if (rateLimitInfo) {
+          console.warn(`[ExecutionService] Rate limited, retry after ${rateLimitInfo.retryAfter}s`);
+          onUpdate?.('rate_limited', {
+            status: 'rate_limited',
+            retryAfter: rateLimitInfo.retryAfter,
+            error: execution.error
+          });
+
+          // Don't wait here - let the user see the countdown
+          // Just continue polling to check if retry period has passed
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          polls++;
+          continue;
+        }
+      }
+
+      // Check if execution contains rate limit error (legacy check)
+      if (execution.error) {
+        const rateLimitInfo = parseRateLimitInfo(execution);
+        if (rateLimitInfo) {
+          console.warn(`[ExecutionService] Execution contains rate limit error, retry after ${rateLimitInfo.retryAfter}s`);
+          onUpdate?.('rate_limited', {
+            status: 'rate_limited',
+            retryAfter: rateLimitInfo.retryAfter
+          });
+
+          // Wait for retry period
+          await new Promise(resolve => setTimeout(resolve, rateLimitInfo.retryAfter * 1000));
+          polls++;
+          continue;
+        }
+      }
+
       onUpdate?.(execution.status, execution);
 
       if (execution.status === 'completed') {
