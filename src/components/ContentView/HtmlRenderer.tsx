@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from 'react';
 import DOMPurify from 'dompurify';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Share2, ExternalLink } from 'lucide-react';
 import type { ContentViewerProps } from '../../types/contentView';
 import { extractPureContent } from '../../utils/contentDetection';
 
@@ -30,6 +30,9 @@ const PURIFY_CONFIG = {
 export function HtmlRenderer({ content, title }: ContentViewerProps) {
   const [copied, setCopied] = useState(false);
   const [renderMode, setRenderMode] = useState<'safe' | 'sandbox'>('sandbox');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   // Extract pure HTML content (remove JSON wrappers, etc.)
   const pureContent = useMemo(() => {
@@ -51,6 +54,46 @@ export function HtmlRenderer({ content, title }: ContentViewerProps) {
     }).catch(err => {
       console.error('Failed to copy:', err);
     });
+  };
+
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    try {
+      const response = await fetch('/api/artifacts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: pureContent,
+          title: title || 'HTML Artifact',
+          sourceType: 'execution_result',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to publish artifact');
+      }
+
+      const data = await response.json();
+      setPublishedUrl(data.url);
+    } catch (error) {
+      console.error('Error publishing artifact:', error);
+      alert('Failed to publish HTML. Please try again.');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleCopyUrl = () => {
+    if (publishedUrl) {
+      navigator.clipboard.writeText(publishedUrl).then(() => {
+        setUrlCopied(true);
+        setTimeout(() => setUrlCopied(false), 2000);
+      }).catch(err => {
+        console.error('Failed to copy URL:', err);
+      });
+    }
   };
 
   return (
@@ -94,6 +137,35 @@ export function HtmlRenderer({ content, title }: ContentViewerProps) {
             </button>
           </div>
           <button
+            onClick={handlePublish}
+            disabled={isPublishing || !!publishedUrl}
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-colors ${
+              publishedUrl
+                ? 'bg-green-100 text-green-700 border border-green-300'
+                : isPublishing
+                ? 'bg-gray-100 text-gray-400 border border-gray-300 cursor-wait'
+                : 'bg-blue-500 text-white hover:bg-blue-600'
+            }`}
+            title="Publish HTML and get shareable link"
+          >
+            {isPublishing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Publishing...
+              </>
+            ) : publishedUrl ? (
+              <>
+                <Check className="w-4 h-4" />
+                Published
+              </>
+            ) : (
+              <>
+                <Share2 className="w-4 h-4" />
+                Publish
+              </>
+            )}
+          </button>
+          <button
             onClick={handleCopy}
             className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-colors ${
               copied
@@ -116,6 +188,59 @@ export function HtmlRenderer({ content, title }: ContentViewerProps) {
           </button>
         </div>
       </div>
+
+      {/* Published URL Section */}
+      {publishedUrl && (
+        <div className="px-4 py-3 bg-green-50 border-b border-green-200">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1">
+              <div className="text-xs font-medium text-green-800 mb-1">
+                Published Successfully!
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={publishedUrl}
+                  readOnly
+                  className="flex-1 px-2 py-1 text-sm bg-white border border-green-300 rounded font-mono"
+                  onClick={(e) => e.currentTarget.select()}
+                />
+                <button
+                  onClick={handleCopyUrl}
+                  className={`flex items-center gap-1 px-3 py-1 text-sm rounded transition-colors ${
+                    urlCopied
+                      ? 'bg-green-600 text-white'
+                      : 'bg-green-500 text-white hover:bg-green-600'
+                  }`}
+                  title="Copy URL to clipboard"
+                >
+                  {urlCopied ? (
+                    <>
+                      <Check className="w-3 h-3" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      Copy URL
+                    </>
+                  )}
+                </button>
+                <a
+                  href={publishedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Open
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rendered HTML */}
       <div className="flex-1 overflow-auto">

@@ -4,7 +4,7 @@
  * Uses react-markdown with security best practices
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Copy, Check } from 'lucide-react';
 import type { ContentViewerProps } from '../../types/contentView';
@@ -12,47 +12,69 @@ import { extractPureContent } from '../../utils/contentDetection';
 
 export function MarkdownRenderer({ content, title }: ContentViewerProps) {
   const [copied, setCopied] = useState(false);
+  const markdownRef = useRef<HTMLDivElement>(null);
 
   // Extract pure Markdown content (remove JSON wrappers, etc.)
   const pureContent = useMemo(() => {
     return extractPureContent(content, 'markdown');
   }, [content]);
 
-  const handleCopy = () => {
-    // Use textarea method for guaranteed plain text copy
-    // This prevents the browser from including any rich text formatting
-    const textarea = document.createElement('textarea');
-    textarea.value = pureContent;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-999999px';
-    textarea.style.top = '-999999px';
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
+  const handleCopy = async () => {
+    // Copy the rendered HTML content as rich text
+    if (!markdownRef.current) return;
 
     try {
-      // Use execCommand as it guarantees plain text
-      const successful = document.execCommand('copy');
-      if (successful) {
+      const htmlContent = markdownRef.current.innerHTML;
+
+      // Create a Blob with both HTML and plain text formats
+      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const textBlob = new Blob([pureContent], { type: 'text/plain' });
+
+      // Use the modern Clipboard API to write both formats
+      const clipboardItem = new ClipboardItem({
+        'text/html': htmlBlob,
+        'text/plain': textBlob,
+      });
+
+      await navigator.clipboard.write([clipboardItem]);
+
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy formatted text:', err);
+
+      // Fallback: try to copy just the HTML using the older method
+      try {
+        const htmlContent = markdownRef.current!.innerHTML;
+
+        // Create a temporary div with the HTML content
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        tempDiv.style.position = 'fixed';
+        tempDiv.style.left = '-999999px';
+        tempDiv.style.top = '-999999px';
+        document.body.appendChild(tempDiv);
+
+        // Select the content
+        const range = document.createRange();
+        range.selectNodeContents(tempDiv);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+
+        // Copy
+        document.execCommand('copy');
+
+        // Cleanup
+        selection?.removeAllRanges();
+        document.body.removeChild(tempDiv);
+
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } else {
-        // Fallback to clipboard API
-        navigator.clipboard.writeText(pureContent).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }).catch(err => {
-          console.error('Failed to copy:', err);
-        });
+      } catch (fallbackErr) {
+        console.error('Fallback copy also failed:', fallbackErr);
+        alert('Failed to copy formatted text. Please try selecting and copying manually.');
       }
-    } catch (err) {
-      console.error('Failed to copy:', err);
-      // Final fallback
-      navigator.clipboard.writeText(pureContent).catch(e => {
-        console.error('All copy methods failed:', e);
-      });
-    } finally {
-      document.body.removeChild(textarea);
     }
   };
 
@@ -70,7 +92,7 @@ export function MarkdownRenderer({ content, title }: ContentViewerProps) {
               ? 'bg-green-100 text-green-700 border border-green-300'
               : 'bg-white hover:bg-gray-100 border border-gray-300'
           }`}
-          title="Copy markdown to clipboard"
+          title="Copy formatted text to clipboard"
         >
           {copied ? (
             <>
@@ -88,7 +110,7 @@ export function MarkdownRenderer({ content, title }: ContentViewerProps) {
 
       {/* Rendered Markdown */}
       <div className="flex-1 overflow-auto">
-        <div className="prose prose-sm max-w-none p-6 bg-white rounded border border-gray-200">
+        <div ref={markdownRef} className="prose prose-sm max-w-none p-6 bg-white rounded border border-gray-200">
           <ReactMarkdown
             skipHtml={true}
             components={{
