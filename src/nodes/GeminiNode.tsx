@@ -35,6 +35,22 @@ export interface GeminiNodeData {
   bypassed?: boolean;
 }
 
+// Detect media URLs in text (similar to backend logic)
+const detectMediaUrl = (text: string): boolean => {
+  if (!text) return false;
+  const urlPattern = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+  const urls = text.match(urlPattern);
+  if (!urls) return false;
+
+  // Check if any URL is a media URL
+  const mediaPatterns = [
+    /youtube\.com|youtu\.be/i,  // YouTube
+    /\.(jpg|jpeg|png|gif|webp|bmp|svg|mp4|webm|avi|mov|mkv|pdf|mp3|wav|ogg|m4a|aac)($|\?)/i  // Media files
+  ];
+
+  return urls.some(url => mediaPatterns.some(pattern => pattern.test(url)));
+};
+
 const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as GeminiNodeData;
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
@@ -42,6 +58,9 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
   const [copied, setCopied] = useState(false);
   const [showToolSelector, setShowToolSelector] = useState(false);
   const [configuringTool, setConfiguringTool] = useState<string | null>(null);
+
+  // Detect if prompt contains media URLs
+  const hasMediaUrl = detectMediaUrl(nodeData.userPrompt || '') || detectMediaUrl(nodeData.systemPrompt || '');
 
   const handleDataChange = (field: keyof GeminiNodeData, value: string | number | boolean) => {
     updateNodeData(id, { [field]: value });
@@ -186,6 +205,14 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
             >
               {nodeData.compactMode ? '📋 Expand' : '📝 Compact'}
             </button>
+            {hasMediaUrl && (
+              <div
+                className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded border border-purple-200"
+                title="Media URL detected - will use multimodal analysis (YouTube, images, PDFs, audio)"
+              >
+                🔗 URL
+              </div>
+            )}
           </div>
           <div className="text-xs text-gray-500 ml-10">ID: {id}</div>
         </div>
@@ -231,14 +258,14 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
               <span className="font-medium">Config:</span>
               <span>Temp {nodeData.temperature} • {nodeData.maxTokens} tokens</span>
             </div>
-            {(nodeData.hybridReasoning || nodeData.multimodal) && (
+            {(nodeData.hybridReasoning || hasMediaUrl) && (
               <div className="flex flex-wrap gap-1">
                 {nodeData.hybridReasoning && (
                   <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
                     🧠 Hybrid Reasoning
                   </span>
                 )}
-                {nodeData.multimodal && (
+                {hasMediaUrl && (
                   <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">
                     🎥 Multimodal
                   </span>
@@ -324,18 +351,18 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
                 Hybrid Reasoning Mode
               </label>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={nodeData.multimodal || false}
-                onChange={(e) => handleDataChange('multimodal', e.target.checked)}
-                className="w-4 h-4"
-                title="Enable analysis of images, videos (YouTube), PDFs, and audio files"
-              />
-              <label className="text-xs font-medium text-gray-600" title="Supports: YouTube videos, images (JPG/PNG/WebP), PDFs, and audio files">
-                Multimodal Input (video, images, PDF, audio)
-              </label>
-            </div>
+            {/* Multimodal Input: Auto-detected from URLs in prompts - no checkbox needed */}
+            {hasMediaUrl && (
+              <div className="p-2 bg-purple-50 rounded border border-purple-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-purple-700">🎥</span>
+                  <div className="flex-1">
+                    <div className="text-xs font-semibold text-purple-800">Multimodal Analysis Enabled</div>
+                    <div className="text-xs text-purple-600">Media URL detected - will use Google SDK for video/image/PDF analysis</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* System Prompt */}

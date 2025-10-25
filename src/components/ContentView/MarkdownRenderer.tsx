@@ -9,6 +9,7 @@ import ReactMarkdown from 'react-markdown';
 import { Copy, Check } from 'lucide-react';
 import type { ContentViewerProps } from '../../types/contentView';
 import { extractPureContent } from '../../utils/contentDetection';
+import { preprocessTableHTML, containsTables } from '../../utils/tablePreprocessor';
 
 export function MarkdownRenderer({ content, title }: ContentViewerProps) {
   const [copied, setCopied] = useState(false);
@@ -24,7 +25,14 @@ export function MarkdownRenderer({ content, title }: ContentViewerProps) {
     if (!markdownRef.current) return;
 
     try {
-      const htmlContent = markdownRef.current.innerHTML;
+      let htmlContent = markdownRef.current.innerHTML;
+
+      // Preprocess tables for rich text editor compatibility
+      if (containsTables(htmlContent)) {
+        console.log('Tables detected - preprocessing for rich text compatibility...');
+        htmlContent = preprocessTableHTML(htmlContent);
+        console.log('Table preprocessing complete');
+      }
 
       // Create a Blob with both HTML and plain text formats
       const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
@@ -45,7 +53,12 @@ export function MarkdownRenderer({ content, title }: ContentViewerProps) {
 
       // Fallback: try to copy just the HTML using the older method
       try {
-        const htmlContent = markdownRef.current!.innerHTML;
+        let htmlContent = markdownRef.current!.innerHTML;
+
+        // Preprocess tables for fallback method too
+        if (containsTables(htmlContent)) {
+          htmlContent = preprocessTableHTML(htmlContent);
+        }
 
         // Create a temporary div with the HTML content
         const tempDiv = document.createElement('div');
