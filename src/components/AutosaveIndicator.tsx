@@ -1,4 +1,5 @@
 import { memo, useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import type { AutosaveStatus } from '../hooks/useFlowPersistence';
 
 interface AutosaveIndicatorProps {
@@ -6,7 +7,9 @@ interface AutosaveIndicatorProps {
   lastSavedAt: string | null;
   flowName: string;
   isDirty: boolean;
+  autosaveEnabled: boolean; // NEW: Guard flag
   onFlowNameChange?: (name: string) => void;
+  onAutosaveEnable?: () => void; // NEW: Callback to enable autosave after rename
 }
 
 const AutosaveIndicator = memo(({
@@ -14,7 +17,9 @@ const AutosaveIndicator = memo(({
   lastSavedAt,
   flowName,
   isDirty,
+  autosaveEnabled,
   onFlowNameChange,
+  onAutosaveEnable,
 }: AutosaveIndicatorProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(flowName);
@@ -32,6 +37,15 @@ const AutosaveIndicator = memo(({
   const safeFlowName = typeof flowName === 'string' ? flowName : 'Untitled Flow';
 
   const getStatusDisplay = () => {
+    // Check autosave disabled state first (NEW)
+    if (!autosaveEnabled) {
+      return {
+        icon: '🔒',
+        text: 'Autosave disabled - Save to enable',
+        className: 'text-orange-600 bg-orange-50',
+      };
+    }
+
     switch (status) {
       case 'saving':
         return {
@@ -92,13 +106,39 @@ const AutosaveIndicator = memo(({
   const statusDisplay = getStatusDisplay();
   const lastSavedDisplay = formatLastSaved();
 
-  const handleNameSave = () => {
-    if (editName.trim() && editName !== safeFlowName && onFlowNameChange) {
-      onFlowNameChange(editName.trim());
-    } else {
+  const handleNameSave = async () => {
+    const trimmedName = editName.trim();
+
+    // Validate name
+    if (!trimmedName || trimmedName === safeFlowName) {
       setEditName(safeFlowName);
+      setIsEditing(false);
+      return;
     }
-    setIsEditing(false);
+
+    try {
+      // Update flow name
+      if (onFlowNameChange) {
+        await onFlowNameChange(trimmedName);
+      }
+
+      // CRITICAL: Enable autosave after explicit rename
+      if (onAutosaveEnable) {
+        onAutosaveEnable();
+      }
+
+      setIsEditing(false);
+
+      // Show toast notification
+      toast.success('Flow renamed', {
+        description: `Autosave is now enabled for "${trimmedName}"`,
+      });
+    } catch (error) {
+      console.error('Failed to rename flow:', error);
+      toast.error('Failed to rename flow');
+      setEditName(safeFlowName);
+      setIsEditing(false);
+    }
   };
 
   const handleNameKeyDown = (e: React.KeyboardEvent) => {

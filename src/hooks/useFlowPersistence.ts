@@ -24,10 +24,12 @@ interface FlowPersistenceState {
   autosaveStatus: AutosaveStatus;
   lastSavedAt: string | null;
   isDirty: boolean;
+  autosaveEnabled: boolean;         // NEW: Guard flag
+  hasBeenManuallyNamed: boolean;    // NEW: Track explicit naming
 }
 
 export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
-  const { autosaveEnabled = true, autosaveDelayMs = 2000 } = options;
+  const { autosaveEnabled = true, autosaveDelayMs = 10000 } = options; // Changed from 2000 to 10000 (10 seconds)
 
   const { toObject } = useReactFlow();
   const nodes = useFlowStore((state) => state.nodes);
@@ -39,6 +41,8 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
     autosaveStatus: 'idle',
     lastSavedAt: null,
     isDirty: false,
+    autosaveEnabled: false,           // Start disabled
+    hasBeenManuallyNamed: false,      // Start false
   });
 
   const autosaveTimerRef = useRef<number | null>(null);
@@ -273,6 +277,8 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
         currentFlowName: flow.name,
         lastSavedAt: flow.updatedAt,
         isDirty: false,
+        autosaveEnabled: false,         // RESET on load
+        hasBeenManuallyNamed: false,    // RESET on load
       }));
 
       // Update refs
@@ -307,6 +313,8 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
       autosaveStatus: 'idle',
       lastSavedAt: null,
       isDirty: false,
+      autosaveEnabled: false,         // Start disabled
+      hasBeenManuallyNamed: false,    // Start false
     });
 
     lastSavedNodesRef.current = '';
@@ -471,6 +479,8 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
           isDirty: false, // Starts clean, autosave will trigger from nodes changing
           lastSavedAt: null,
           autosaveStatus: 'idle', // Reset status from any previous saves
+          autosaveEnabled: false,         // Start disabled
+          hasBeenManuallyNamed: false,    // Start false
         };
       });
 
@@ -517,12 +527,19 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
    * Respects import flag to prevent race conditions during import
    */
   useEffect(() => {
-    // Skip autosave during import to prevent race conditions
+    // GUARD 1: Skip if import in progress
     if (isImportingRef.current) {
       console.log('[autosave] Skipped - import in progress');
       return;
     }
 
+    // GUARD 2: Skip if autosave not enabled (NEW)
+    if (!state.autosaveEnabled) {
+      console.log('[autosave] Skipped - waiting for first save');
+      return;
+    }
+
+    // GUARD 3: Check hook-level autosave flag
     if (!autosaveEnabled) return;
 
     // Check if flow has changed since last save
@@ -570,7 +587,7 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, autosaveEnabled, autosaveDelayMs, state.currentFlowId]);
+  }, [nodes, edges, autosaveEnabled, autosaveDelayMs, state.currentFlowId, state.autosaveEnabled]);
 
   /**
    * Restore last opened flow on mount ONLY
@@ -623,6 +640,8 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
           autosaveStatus: 'idle',
           lastSavedAt: flow.updatedAt,
           isDirty: false,
+          autosaveEnabled: false,         // RESET on restore
+          hasBeenManuallyNamed: false,    // RESET on restore
         });
 
         // Update refs
@@ -672,5 +691,6 @@ export function useFlowPersistence(options: FlowPersistenceOptions = {}) {
     newFlow,
     renameFlow,
     importFlow, // New: allows ImportButton to update flow metadata
+    setState, // NEW: Expose setState for external updates (e.g., enabling autosave)
   };
 }

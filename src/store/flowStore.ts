@@ -10,6 +10,7 @@ export interface SavedFlow {
   edges: Edge[];
   createdAt: string;
   updatedAt: string;
+  pinLevel: 'none' | 'user' | 'global'; // Pin status
 }
 
 interface FlowState {
@@ -17,6 +18,7 @@ interface FlowState {
   edges: Edge[];
   currentFlowId: string | null;
   savedFlows: SavedFlow[];
+  userPinnedFlows: Set<string>; // Device-specific pins
   executionResults: Map<string, ExecutionResult> | null; // Store latest execution results
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -30,6 +32,16 @@ interface FlowState {
   deleteFlow: (flowId: string) => void;
   clearCanvas: () => void;
   setExecutionResults: (results: Map<string, ExecutionResult> | null) => void;
+  togglePin: (flowId: string) => Promise<void>;
+  getPinLevel: (flowId: string) => 'none' | 'user' | 'global';
+  canDelete: (flowId: string) => boolean;
+}
+
+// Helper function to get next pin level in cycle
+function getNextPinLevel(current: 'none' | 'user' | 'global'): 'none' | 'user' | 'global' {
+  const cycle = ['none', 'user', 'global'] as const;
+  const currentIndex = cycle.indexOf(current);
+  return cycle[(currentIndex + 1) % 3];
 }
 
 export const useFlowStore = create<FlowState>()(
@@ -52,6 +64,7 @@ export const useFlowStore = create<FlowState>()(
       edges: [],
       currentFlowId: null,
       savedFlows: [],
+      userPinnedFlows: new Set<string>(),
       executionResults: null,
 
       setNodes: (nodes) => set({ nodes }),
@@ -122,6 +135,7 @@ export const useFlowStore = create<FlowState>()(
             edges: state.edges,
             createdAt: now,
             updatedAt: now,
+            pinLevel: 'none', // Default for new flows
           };
           set((state) => ({
             savedFlows: [...state.savedFlows, newFlow],
@@ -143,6 +157,11 @@ export const useFlowStore = create<FlowState>()(
       },
 
       deleteFlow: (flowId) => {
+        const state = get();
+        if (!state.canDelete(flowId)) {
+          throw new Error('Cannot delete pinned flow. Unpin it first.');
+        }
+
         set((state) => ({
           savedFlows: state.savedFlows.filter((f) => f.id !== flowId),
           currentFlowId: state.currentFlowId === flowId ? null : state.currentFlowId,
@@ -161,6 +180,105 @@ export const useFlowStore = create<FlowState>()(
       setExecutionResults: (results) => {
         set({ executionResults: results });
       },
+
+      // Pin management methods
+      togglePin: async (flowId: string) => {
+        const state = get();
+        const currentLevel = state.getPinLevel(flowId);
+        const nextLevel = getNextPinLevel(currentLevel);
+
+        if (nextLevel === 'user') {
+          // Add to local user pins
+          set(state => ({
+            userPinnedFlows: new Set(state.userPinnedFlows).add(flowId),
+            savedFlows: state.savedFlows.map(f =>
+              f.id === flowId ? { ...f, pinLevel: 'none' } : f
+            )
+          }));
+        } else if (nextLevel === 'global') {
+          // Remove from user pins, add to global
+          const newUserPins = new Set(state.userPinnedFlows);
+          newUserPins.delete(flowId);
+
+          set({ userPinnedFlows: newUserPins });
+
+          // Sync to backend
+          try {
+            const response = await fetch(`/api/flows/${flowId}/pin`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-user-id': localStorage.getItem('visual-flow-device-id') || '',
+              },
+              body: JSON.stringify({ pinLevel: 'global' }),
+            });
+
+            if (!response.ok) throw new Error('Failed to pin globally');
+
+            set(state => ({
+              savedFlows: state.savedFlows.map(f =>
+                f.id === flowId ? { ...f, pinLevel: 'global' } : f
+              )
+            }));
+          } catch (error) {
+            console.error('Failed to pin globally:', error);
+            // Rollback
+            set(state => ({
+              savedFlows: state.savedFlows.map(f =>
+                f.id === flowId ? { ...f, pinLevel: 'none' } : f
+              )
+            }));
+          }
+        } else {
+          // Unpin (none)
+          const newUserPins = new Set(state.userPinnedFlows);
+          newUserPins.delete(flowId);
+
+          set({ userPinnedFlows: newUserPins });
+
+          const flow = state.savedFlows.find(f => f.id === flowId);
+          if (flow?.pinLevel === 'global') {
+            // Unpin from backend
+            try {
+              await fetch(`/api/flows/${flowId}/pin`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-user-id': localStorage.getItem('visual-flow-device-id') || '',
+                },
+                body: JSON.stringify({ pinLevel: 'none' }),
+              });
+
+              set(state => ({
+                savedFlows: state.savedFlows.map(f =>
+                  f.id === flowId ? { ...f, pinLevel: 'none' } : f
+                )
+              }));
+            } catch (error) {
+              console.error('Failed to unpin:', error);
+            }
+          } else {
+            set(state => ({
+              savedFlows: state.savedFlows.map(f =>
+                f.id === flowId ? { ...f, pinLevel: 'none' } : f
+              )
+            }));
+          }
+        }
+      },
+
+      getPinLevel: (flowId: string) => {
+        const state = get();
+        const flow = state.savedFlows.find(f => f.id === flowId);
+
+        if (flow?.pinLevel === 'global') return 'global';
+        if (state.userPinnedFlows.has(flowId)) return 'user';
+        return 'none';
+      },
+
+      canDelete: (flowId: string) => {
+        return get().getPinLevel(flowId) === 'none';
+      },
     }),
     {
       name: 'flow-storage',
@@ -169,7 +287,23 @@ export const useFlowStore = create<FlowState>()(
         edges: state.edges,
         currentFlowId: state.currentFlowId,
         savedFlows: state.savedFlows,
+        userPinnedFlows: Array.from(state.userPinnedFlows), // Convert Set to Array for persistence
       }),
+      merge: (persistedState: any, currentState: FlowState) => {
+        // Convert userPinnedFlows array back to Set on load
+        // Ensure all savedFlows have pinLevel property for backward compatibility
+        const savedFlows = (persistedState?.savedFlows || []).map((flow: any) => ({
+          ...flow,
+          pinLevel: flow.pinLevel || 'none',
+        }));
+
+        return {
+          ...currentState,
+          ...persistedState,
+          savedFlows,
+          userPinnedFlows: new Set(persistedState?.userPinnedFlows || []),
+        };
+      },
     }
   )
 );

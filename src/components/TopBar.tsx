@@ -18,7 +18,7 @@ interface TopBarProps {
   onHistoryClick: () => void;
   onFlowsToggle: () => void;
   onRunFlow: () => void;
-  onSaveFlow: () => Promise<any>;
+  onSaveFlow: () => void;
   onNewFlow: () => void;
   onImportFlow: (name: string) => void;
   isExecuting: boolean;
@@ -29,7 +29,9 @@ interface TopBarProps {
   autosaveStatus: AutosaveStatus;
   lastSavedAt: string | null;
   isDirty: boolean;
+  autosaveEnabled: boolean;
   onFlowNameChange: (name: string) => void;
+  onAutosaveEnable: () => void; // NEW: Callback to enable autosave
 }
 
 const TopBar = ({
@@ -47,7 +49,9 @@ const TopBar = ({
   autosaveStatus,
   lastSavedAt,
   isDirty,
+  autosaveEnabled,
   onFlowNameChange,
+  onAutosaveEnable,
 }: TopBarProps) => {
   const nodes = useFlowStore((state) => state.nodes);
 
@@ -97,7 +101,9 @@ const TopBar = ({
           lastSavedAt={lastSavedAt}
           flowName={flowName}
           isDirty={isDirty}
+          autosaveEnabled={autosaveEnabled}
           onFlowNameChange={onFlowNameChange}
+          onAutosaveEnable={onAutosaveEnable}
         />
       </div>
 

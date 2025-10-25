@@ -3,6 +3,8 @@ import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeChange, EdgeChange, Connection } from '@xyflow/react';
 import type { DragEvent } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { Toaster, toast } from 'sonner';
 import { nodeTypes } from './nodes';
 import NodePalette from './components/NodePalette';
 import TopBar from './components/TopBar';
@@ -10,6 +12,7 @@ import FlowListSidebar from './components/FlowListSidebar';
 import ExecutionPanel, { type ExecutionHistory } from './components/ExecutionPanel';
 import VersionDisplay from './components/VersionDisplay';
 import RateLimitAlert from './components/RateLimitAlert';
+import { SaveAsModal } from './components/SaveAsModal';
 import { executeFlow, executeFlowWithTrace, executeFlowAsyncWithPolling } from './services/executionService';
 import type { ExecutionResult } from './utils/executionEngine';
 import { useFlowStore } from './store/flowStore';
@@ -28,6 +31,7 @@ function AppContent() {
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>([]);
   const [currentExecution, setCurrentExecution] = useState<Map<string, ExecutionResult> | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ retryAfter: number } | null>(null);
+  const [showSaveAsModal, setShowSaveAsModal] = useState(false);
 
   const nodes = useFlowStore((state) => state.nodes);
   const edges = useFlowStore((state) => state.edges);
@@ -42,12 +46,16 @@ function AppContent() {
     autosaveStatus,
     lastSavedAt,
     isDirty,
+    autosaveEnabled,
+    hasBeenManuallyNamed,
     saveFlow,
     loadFlow,
     newFlow,
     renameFlow,
     importFlow,
-  } = useFlowPersistence({ autosaveEnabled: true, autosaveDelayMs: 2000 });
+    forceSave,
+    setState,
+  } = useFlowPersistence({ autosaveEnabled: true, autosaveDelayMs: 10000 });
 
   // Load execution history when flow changes (Cache → Frontend → Backend)
   useEffect(() => {
@@ -136,6 +144,76 @@ function AppContent() {
 
     loadHistory();
   }, [currentFlowId]);
+
+  // Handle Save As modal workflow
+  const handleSaveClick = useCallback(() => {
+    // Show modal if autosave is disabled (first save after load/import/new)
+    if (!autosaveEnabled) {
+      setShowSaveAsModal(true);
+    } else {
+      // Direct save if autosave already enabled
+      saveFlow().catch((error) => {
+        toast.error('Failed to save flow', {
+          description: error.message,
+        });
+      });
+    }
+  }, [autosaveEnabled, saveFlow]);
+
+  // Save As handler - enables autosave after first save
+  const handleSaveAs = useCallback(async (name: string, overwrite: boolean) => {
+    try {
+      if (overwrite && currentFlowId) {
+        // Overwrite existing flow
+        await saveFlow(name);
+        toast.success('Flow updated successfully', {
+          description: `"${name}" has been saved`,
+        });
+      } else {
+        // Create new flow
+        await saveFlow(name);
+        toast.success('Flow created successfully', {
+          description: `"${name}" has been saved. Autosave is now enabled.`,
+        });
+      }
+    } catch (error: any) {
+      toast.error('Failed to save flow', {
+        description: error.message,
+      });
+      throw error; // Re-throw to let modal handle it
+    }
+  }, [currentFlowId, saveFlow]);
+
+  // Handle autosave enable from inline rename (Path 2)
+  const handleAutosaveEnable = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      autosaveEnabled: true,
+      hasBeenManuallyNamed: true,
+    }));
+  }, [setState]);
+
+  // Ctrl+S / Cmd+S keyboard shortcut
+  useHotkeys(
+    'ctrl+s, meta+s',
+    (e) => {
+      e.preventDefault(); // Prevent browser save dialog
+
+      if (!autosaveEnabled) {
+        setShowSaveAsModal(true);
+      } else {
+        forceSave().catch((error) => {
+          console.error('Force save failed:', error);
+          toast.error('Failed to save flow');
+        });
+      }
+    },
+    {
+      enableOnFormTags: true, // Allow in input fields
+      preventDefault: true,
+    },
+    [autosaveEnabled, forceSave]
+  );
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -340,6 +418,9 @@ function AppContent() {
 
   return (
     <div ref={reactFlowWrapper} style={{ width: '100vw', height: '100vh' }}>
+      {/* Toast notifications */}
+      <Toaster position="top-right" richColors />
+
       {/* Rate Limit Alert - Show when rate limited */}
       {rateLimitInfo && (
         <RateLimitAlert
@@ -352,11 +433,20 @@ function AppContent() {
         />
       )}
 
+      {/* Save As Modal */}
+      <SaveAsModal
+        isOpen={showSaveAsModal}
+        onClose={() => setShowSaveAsModal(false)}
+        onSave={handleSaveAs}
+        currentFlowName={currentFlowName}
+        currentFlowId={currentFlowId}
+      />
+
       <TopBar
         onHistoryClick={() => setShowHistory(!showHistory)}
         onFlowsToggle={() => setShowFlows(!showFlows)}
         onRunFlow={() => handleExecute({})}
-        onSaveFlow={() => saveFlow()}
+        onSaveFlow={handleSaveClick}
         onNewFlow={newFlow}
         onImportFlow={importFlow}
         isExecuting={isExecuting}
@@ -367,7 +457,9 @@ function AppContent() {
         autosaveStatus={autosaveStatus}
         lastSavedAt={lastSavedAt}
         isDirty={isDirty}
+        autosaveEnabled={autosaveEnabled}
         onFlowNameChange={renameFlow}
+        onAutosaveEnable={handleAutosaveEnable}
       />
       <ReactFlow
         nodes={nodes}

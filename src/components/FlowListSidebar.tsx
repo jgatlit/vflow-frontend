@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { db, getAllFlows, searchFlows } from '../db/database';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { Trash2 } from 'lucide-react';
+import { PinButton } from './PinButton';
+import { useFlowStore } from '../store/flowStore';
 
 interface FlowListSidebarProps {
   isOpen: boolean;
@@ -35,10 +38,26 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow, onClose
     status: typeof flow.status === 'string' ? flow.status : undefined,
     version: typeof flow.version === 'string' ? flow.version : '1.0.0',
     updatedAt: typeof flow.updatedAt === 'string' ? flow.updatedAt : new Date().toISOString(),
+    pinLevel: (flow as any).pinLevel || 'none', // Default to 'none' for backward compatibility
   }));
 
-  // Sort flows based on selected criteria
+  // Get pin level from store
+  const getPinLevel = useFlowStore(state => state.getPinLevel);
+
+  // Sort flows with smart pin sorting
   const sortedFlows = flows?.sort((a, b) => {
+    const aPinLevel = getPinLevel(a.id);
+    const bPinLevel = getPinLevel(b.id);
+
+    // Priority 1: Global pins first
+    if (aPinLevel === 'global' && bPinLevel !== 'global') return -1;
+    if (bPinLevel === 'global' && aPinLevel !== 'global') return 1;
+
+    // Priority 2: User pins second
+    if (aPinLevel === 'user' && bPinLevel === 'none') return -1;
+    if (bPinLevel === 'user' && aPinLevel === 'none') return 1;
+
+    // Priority 3: Within same pin level, sort by selected criteria
     switch (sortBy) {
       case 'updated':
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -53,7 +72,14 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow, onClose
     }
   });
 
+  const canDelete = useFlowStore(state => state.canDelete);
+
   const handleDeleteFlow = async (flowId: string, flowName: string) => {
+    if (!canDelete(flowId)) {
+      alert('Cannot delete pinned flow. Unpin it first.');
+      return;
+    }
+
     if (confirm(`Delete "${flowName}"? This will mark it as deleted but can be recovered.`)) {
       await db.flows.update(flowId, {
         deleted: true,
@@ -282,16 +308,41 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow, onClose
                   >
                     📂
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteFlow(flow.id, flow.name);
-                    }}
-                    className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                    title="Delete flow"
-                  >
-                    🗑️
-                  </button>
+
+                  <PinButton flowId={flow.id} />
+
+                  <div className="relative group">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteFlow(flow.id, flow.name);
+                      }}
+                      disabled={!canDelete(flow.id)}
+                      className={`
+                        p-1.5 rounded-md transition-all
+                        ${canDelete(flow.id)
+                          ? 'text-gray-600 hover:text-red-600 hover:bg-red-50 cursor-pointer'
+                          : 'text-gray-300 cursor-not-allowed opacity-50'
+                        }
+                      `}
+                      title={canDelete(flow.id) ? 'Delete flow' : 'Unpin this flow to delete it'}
+                      aria-label={canDelete(flow.id) ? 'Delete flow' : 'Cannot delete pinned flow'}
+                      data-testid="delete-button"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
+                    {!canDelete(flow.id) && (
+                      <div className="
+                        absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2
+                        px-3 py-2 bg-gray-900 text-white text-xs rounded-md
+                        whitespace-nowrap opacity-0 group-hover:opacity-100
+                        transition-opacity duration-200 pointer-events-none z-10
+                      ">
+                        Unpin this flow to delete it
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
