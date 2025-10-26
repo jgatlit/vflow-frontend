@@ -41,13 +41,22 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow, onClose
     pinLevel: (flow as any).pinLevel || 'none', // Default to 'none' for backward compatibility
   }));
 
-  // Get pin level from store
-  const getPinLevel = useFlowStore(state => state.getPinLevel);
+  // Get pin state from store
+  const userPinnedFlows = useFlowStore(state => state.userPinnedFlows);
+  const globalPinnedFlows = useFlowStore(state => state.globalPinnedFlows);
+
+  // Helper to get combined pin level (Zustand state + IndexedDB fallback)
+  const getFlowPinLevel = (flow: any) => {
+    if (globalPinnedFlows.has(flow.id)) return 'global';
+    if (flow.pinLevel === 'global') return 'global'; // Fallback to IndexedDB
+    if (userPinnedFlows.has(flow.id)) return 'user';
+    return 'none';
+  };
 
   // Sort flows with smart pin sorting
   const sortedFlows = flows?.sort((a, b) => {
-    const aPinLevel = getPinLevel(a.id);
-    const bPinLevel = getPinLevel(b.id);
+    const aPinLevel = getFlowPinLevel(a);
+    const bPinLevel = getFlowPinLevel(b);
 
     // Priority 1: Global pins first
     if (aPinLevel === 'global' && bPinLevel !== 'global') return -1;
@@ -72,10 +81,9 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow, onClose
     }
   });
 
-  const canDelete = useFlowStore(state => state.canDelete);
-
-  const handleDeleteFlow = async (flowId: string, flowName: string) => {
-    if (!canDelete(flowId)) {
+  const handleDeleteFlow = async (flowId: string, flowName: string, flow: any) => {
+    const pinLevel = getFlowPinLevel(flow);
+    if (pinLevel !== 'none') {
       alert('Cannot delete pinned flow. Unpin it first.');
       return;
     }
@@ -309,30 +317,30 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow, onClose
                     📂
                   </button>
 
-                  <PinButton flowId={flow.id} />
+                  <PinButton flowId={flow.id} currentPinLevel={getFlowPinLevel(flow)} />
 
                   <div className="relative group">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteFlow(flow.id, flow.name);
+                        handleDeleteFlow(flow.id, flow.name, flow);
                       }}
-                      disabled={!canDelete(flow.id)}
+                      disabled={getFlowPinLevel(flow) !== 'none'}
                       className={`
                         p-1.5 rounded-md transition-all
-                        ${canDelete(flow.id)
+                        ${getFlowPinLevel(flow) === 'none'
                           ? 'text-gray-600 hover:text-red-600 hover:bg-red-50 cursor-pointer'
                           : 'text-gray-300 cursor-not-allowed opacity-50'
                         }
                       `}
-                      title={canDelete(flow.id) ? 'Delete flow' : 'Unpin this flow to delete it'}
-                      aria-label={canDelete(flow.id) ? 'Delete flow' : 'Cannot delete pinned flow'}
+                      title={getFlowPinLevel(flow) === 'none' ? 'Delete flow' : 'Unpin this flow to delete it'}
+                      aria-label={getFlowPinLevel(flow) === 'none' ? 'Delete flow' : 'Cannot delete pinned flow'}
                       data-testid="delete-button"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
 
-                    {!canDelete(flow.id) && (
+                    {getFlowPinLevel(flow) !== 'none' && (
                       <div className="
                         absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2
                         px-3 py-2 bg-gray-900 text-white text-xs rounded-md

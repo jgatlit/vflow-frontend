@@ -57,6 +57,11 @@ export interface Flow {
   isTemplate?: boolean; // Is this a reusable template?
   isFavorite?: boolean; // User favorited
 
+  // Pin Management
+  pinLevel?: 'none' | 'user' | 'global'; // Pin status (none=unpinned, user=device pin, global=backend pin)
+  pinnedAt?: string; // When pinned (ISO 8601)
+  pinnedBy?: string; // Who pinned it (device ID or user ID)
+
   // Content
   flow: ReactFlowJsonObject; // React Flow's native format
   thumbnail?: string; // Base64 or URL to workflow visualization
@@ -219,8 +224,22 @@ export async function deleteFlow(id: string): Promise<void> {
 
 /**
  * Get all non-deleted flows
+ * @param syncFromBackend - If true, sync with backend before returning (optional)
  */
-export async function getAllFlows(): Promise<Flow[]> {
+export async function getAllFlows(syncFromBackend: boolean = false): Promise<Flow[]> {
+  // Optional: Sync with backend first
+  if (syncFromBackend) {
+    try {
+      const { syncFlowsFromBackend } = await import('../services/flowSyncService');
+      const synced = await syncFlowsFromBackend();
+      return synced.filter(flow => !flow.deleted);
+    } catch (error) {
+      console.error('[getAllFlows] Backend sync failed, falling back to local:', error);
+      // Continue to local fallback
+    }
+  }
+
+  // Return local IndexedDB flows
   return await db.flows
     .filter(flow => !flow.deleted)
     .sortBy('updatedAt');

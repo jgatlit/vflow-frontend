@@ -4,12 +4,13 @@ import { useFlowStore } from '../store/flowStore';
 
 interface PinButtonProps {
   flowId: string;
+  currentPinLevel?: 'none' | 'user' | 'global'; // Optional: if provided, use this instead of getPinLevel
   className?: string;
 }
 
-export const PinButton: React.FC<PinButtonProps> = ({ flowId, className }) => {
+export const PinButton: React.FC<PinButtonProps> = ({ flowId, currentPinLevel, className }) => {
   const { getPinLevel, togglePin } = useFlowStore();
-  const pinLevel = getPinLevel(flowId);
+  const pinLevel = currentPinLevel ?? getPinLevel(flowId);
 
   const handleClick = async (e: React.MouseEvent) => {
     e.stopPropagation();

@@ -19,6 +19,7 @@ interface FlowState {
   currentFlowId: string | null;
   savedFlows: SavedFlow[];
   userPinnedFlows: Set<string>; // Device-specific pins
+  globalPinnedFlows: Set<string>; // Cross-device global pins (mirrors IndexedDB)
   executionResults: Map<string, ExecutionResult> | null; // Store latest execution results
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -65,6 +66,7 @@ export const useFlowStore = create<FlowState>()(
       currentFlowId: null,
       savedFlows: [],
       userPinnedFlows: new Set<string>(),
+      globalPinnedFlows: new Set<string>(),
       executionResults: null,
 
       setNodes: (nodes) => set({ nodes }),
@@ -187,24 +189,44 @@ export const useFlowStore = create<FlowState>()(
         const currentLevel = state.getPinLevel(flowId);
         const nextLevel = getNextPinLevel(currentLevel);
 
+        console.log('[togglePin] Flow:', flowId);
+        console.log('[togglePin] Current level:', currentLevel, '→ Next level:', nextLevel);
+        console.log('[togglePin] userPinnedFlows:', Array.from(state.userPinnedFlows));
+        console.log('[togglePin] globalPinnedFlows:', Array.from(state.globalPinnedFlows));
+
+        // Import db dynamically to avoid circular dependency
+        const { db } = await import('../db/database');
+
         if (nextLevel === 'user') {
-          // Add to local user pins
+          // Add to local user pins (device-specific via Set)
           set(state => ({
-            userPinnedFlows: new Set(state.userPinnedFlows).add(flowId),
-            savedFlows: state.savedFlows.map(f =>
-              f.id === flowId ? { ...f, pinLevel: 'none' } : f
-            )
+            userPinnedFlows: new Set(state.userPinnedFlows).add(flowId)
           }));
+          console.log('[togglePin] Set as user pin (device-specific)');
+
         } else if (nextLevel === 'global') {
-          // Remove from user pins, add to global
+          // Remove from user pins, set as global pin
           const newUserPins = new Set(state.userPinnedFlows);
           newUserPins.delete(flowId);
-
           set({ userPinnedFlows: newUserPins });
 
-          // Sync to backend
+          // Get flow from IndexedDB
+          const flow = await db.flows.get(flowId);
+          if (!flow) {
+            console.error('[togglePin] Flow not found in IndexedDB:', flowId);
+            // Rollback
+            const restoredUserPins = new Set(state.userPinnedFlows);
+            restoredUserPins.add(flowId);
+            set({ userPinnedFlows: restoredUserPins });
+            return;
+          }
+
+          // Sync to backend API
           try {
-            const response = await fetch(`/api/flows/${flowId}/pin`, {
+            console.log('[togglePin] Attempting to set global pin for flow:', flowId);
+
+            // First try to pin the existing flow
+            let response = await fetch(`/api/flows/${flowId}/pin`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -213,30 +235,86 @@ export const useFlowStore = create<FlowState>()(
               body: JSON.stringify({ pinLevel: 'global' }),
             });
 
-            if (!response.ok) throw new Error('Failed to pin globally');
+            // If flow not found (500), create it first then pin
+            if (response.status === 500) {
+              const errorData = await response.json();
+              if (errorData.message === 'Flow not found') {
+                console.log('[togglePin] Flow not in backend, syncing flow first...');
 
+                // Sync flow to backend
+                const syncResponse = await fetch('/api/flows', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': localStorage.getItem('visual-flow-device-id') || '',
+                  },
+                  body: JSON.stringify({
+                    id: flow.id,
+                    name: flow.name,
+                    description: flow.description || `Flow with ${flow.flow?.nodes?.length || 0} nodes and ${flow.flow?.edges?.length || 0} connections`,
+                    flow: flow.flow,
+                    tags: flow.tags || ['auto-generated'],
+                    version: flow.version || '1.0.0',
+                  }),
+                });
+
+                if (!syncResponse.ok) {
+                  throw new Error('Failed to sync flow to backend');
+                }
+
+                console.log('[togglePin] Flow synced to backend, now pinning...');
+
+                // Retry pin after sync
+                response = await fetch(`/api/flows/${flowId}/pin`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': localStorage.getItem('visual-flow-device-id') || '',
+                  },
+                  body: JSON.stringify({ pinLevel: 'global' }),
+                });
+              }
+            }
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('[togglePin] API error response:', response.status, errorText);
+              throw new Error(`Failed to pin globally: ${response.status} - ${errorText}`);
+            }
+
+            const responseData = await response.json();
+            console.log('[togglePin] Successfully pinned globally:', responseData);
+
+            // Update IndexedDB with global pin status
+            await db.flows.update(flowId, {
+              pinLevel: 'global',
+              pinnedAt: new Date().toISOString(),
+              pinnedBy: localStorage.getItem('visual-flow-device-id') || 'unknown'
+            });
+
+            // Update Zustand state to track global pin
             set(state => ({
-              savedFlows: state.savedFlows.map(f =>
-                f.id === flowId ? { ...f, pinLevel: 'global' } : f
-              )
+              globalPinnedFlows: new Set(state.globalPinnedFlows).add(flowId)
             }));
+
+            console.log('[togglePin] IndexedDB updated with global pin');
+
           } catch (error) {
-            console.error('Failed to pin globally:', error);
-            // Rollback
-            set(state => ({
-              savedFlows: state.savedFlows.map(f =>
-                f.id === flowId ? { ...f, pinLevel: 'none' } : f
-              )
-            }));
+            console.error('[togglePin] Failed to pin globally:', error);
+            // Rollback: restore user pin
+            const restoredUserPins = new Set(state.userPinnedFlows);
+            restoredUserPins.add(flowId);
+            set({ userPinnedFlows: restoredUserPins });
           }
+
         } else {
-          // Unpin (none)
+          // Unpin (global → none OR user → none)
           const newUserPins = new Set(state.userPinnedFlows);
           newUserPins.delete(flowId);
-
           set({ userPinnedFlows: newUserPins });
 
-          const flow = state.savedFlows.find(f => f.id === flowId);
+          // Check if it's a global pin that needs backend unpin
+          const flow = await db.flows.get(flowId);
           if (flow?.pinLevel === 'global') {
             // Unpin from backend
             try {
@@ -249,29 +327,32 @@ export const useFlowStore = create<FlowState>()(
                 body: JSON.stringify({ pinLevel: 'none' }),
               });
 
-              set(state => ({
-                savedFlows: state.savedFlows.map(f =>
-                  f.id === flowId ? { ...f, pinLevel: 'none' } : f
-                )
-              }));
+              console.log('[togglePin] Unpinned from backend');
             } catch (error) {
-              console.error('Failed to unpin:', error);
+              console.error('[togglePin] Failed to unpin from backend:', error);
             }
-          } else {
-            set(state => ({
-              savedFlows: state.savedFlows.map(f =>
-                f.id === flowId ? { ...f, pinLevel: 'none' } : f
-              )
-            }));
           }
+
+          // Update IndexedDB to remove pin
+          await db.flows.update(flowId, {
+            pinLevel: 'none',
+            pinnedAt: undefined,
+            pinnedBy: undefined
+          });
+
+          // Update Zustand state to remove global pin
+          const newGlobalPins = new Set(state.globalPinnedFlows);
+          newGlobalPins.delete(flowId);
+          set({ globalPinnedFlows: newGlobalPins });
+
+          console.log('[togglePin] Set to none (unpinned)');
         }
       },
 
       getPinLevel: (flowId: string) => {
         const state = get();
-        const flow = state.savedFlows.find(f => f.id === flowId);
 
-        if (flow?.pinLevel === 'global') return 'global';
+        if (state.globalPinnedFlows.has(flowId)) return 'global';
         if (state.userPinnedFlows.has(flowId)) return 'user';
         return 'none';
       },
@@ -288,6 +369,7 @@ export const useFlowStore = create<FlowState>()(
         currentFlowId: state.currentFlowId,
         savedFlows: state.savedFlows,
         userPinnedFlows: Array.from(state.userPinnedFlows), // Convert Set to Array for persistence
+        globalPinnedFlows: Array.from(state.globalPinnedFlows), // Convert Set to Array for persistence
       }),
       merge: (persistedState: any, currentState: FlowState) => {
         // Convert userPinnedFlows array back to Set on load
@@ -302,6 +384,7 @@ export const useFlowStore = create<FlowState>()(
           ...persistedState,
           savedFlows,
           userPinnedFlows: new Set(persistedState?.userPinnedFlows || []),
+          globalPinnedFlows: new Set(persistedState?.globalPinnedFlows || []),
         };
       },
     }

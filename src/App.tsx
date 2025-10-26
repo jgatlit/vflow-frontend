@@ -20,6 +20,7 @@ import { useFlowPersistence } from './hooks/useFlowPersistence';
 import { TraceCacheProvider } from './contexts/TraceCacheContext';
 import { loadExecutionHistory, saveExecutionWithTrace } from './db/database';
 import { fetchExecutionHistory, completeBackendExecution, type ExecutionHistoryItem } from './services/executionService';
+import { syncFlowsFromBackend, startPeriodicSync } from './services/flowSyncService';
 
 function AppContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -32,6 +33,7 @@ function AppContent() {
   const [currentExecution, setCurrentExecution] = useState<Map<string, ExecutionResult> | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ retryAfter: number } | null>(null);
   const [showSaveAsModal, setShowSaveAsModal] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const nodes = useFlowStore((state) => state.nodes);
   const edges = useFlowStore((state) => state.edges);
@@ -56,6 +58,37 @@ function AppContent() {
     forceSave,
     setState,
   } = useFlowPersistence({ autosaveEnabled: true, autosaveDelayMs: 10000 });
+
+  // Sync flows from backend on app mount + periodic background sync
+  useEffect(() => {
+    let cleanupPeriodicSync: (() => void) | undefined;
+
+    async function initialSync() {
+      try {
+        setIsSyncing(true);
+        console.log('[App] Initial flow sync from backend...');
+        await syncFlowsFromBackend();
+        console.log('[App] Initial sync completed');
+
+        // Start periodic background sync (every 5 minutes)
+        cleanupPeriodicSync = startPeriodicSync();
+      } catch (error) {
+        console.error('[App] Initial sync failed:', error);
+        // Don't show error to user - app still works with local data
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+
+    initialSync();
+
+    // Cleanup on unmount
+    return () => {
+      if (cleanupPeriodicSync) {
+        cleanupPeriodicSync();
+      }
+    };
+  }, []); // Run once on mount
 
   // Load execution history when flow changes (Cache → Frontend → Backend)
   useEffect(() => {
@@ -460,6 +493,7 @@ function AppContent() {
         autosaveEnabled={autosaveEnabled}
         onFlowNameChange={renameFlow}
         onAutosaveEnable={handleAutosaveEnable}
+        isSyncing={isSyncing}
       />
       <ReactFlow
         nodes={nodes}

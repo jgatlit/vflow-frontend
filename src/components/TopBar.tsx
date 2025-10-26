@@ -32,6 +32,7 @@ interface TopBarProps {
   autosaveEnabled: boolean;
   onFlowNameChange: (name: string) => void;
   onAutosaveEnable: () => void; // NEW: Callback to enable autosave
+  isSyncing?: boolean; // NEW: Backend sync status
 }
 
 const TopBar = ({
@@ -52,6 +53,7 @@ const TopBar = ({
   autosaveEnabled,
   onFlowNameChange,
   onAutosaveEnable,
+  isSyncing = false,
 }: TopBarProps) => {
   const nodes = useFlowStore((state) => state.nodes);
 
@@ -59,6 +61,14 @@ const TopBar = ({
     <div className="absolute top-0 left-0 right-0 h-12 bg-white border-b border-gray-200 z-20 flex items-center justify-between px-3 shadow-sm">
       {/* Left Section */}
       <div className="flex items-center gap-2">
+        {/* Sync Indicator */}
+        {isSyncing && (
+          <div className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600" title="Syncing flows from backend...">
+            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <span>Syncing...</span>
+          </div>
+        )}
+
         <button
           onClick={onNewFlow}
           className="flex items-center gap-1 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 rounded transition-colors"
