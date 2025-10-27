@@ -33,6 +33,52 @@ function getDeviceId(): string {
 }
 
 /**
+ * Map frontend Flow object to backend-compatible format for CREATE
+ * Includes ID for upsert pattern
+ */
+function mapFlowForCreate(flow: Flow) {
+  return {
+    id: flow.id,
+    name: flow.name,
+    description: flow.description,
+    flow: flow.flow,
+    tags: flow.tags || [],
+    category: flow.category,
+    visibility: flow.visibility,
+    status: flow.status,
+    isTemplate: flow.isTemplate,
+    isFavorite: flow.isFavorite,
+    version: flow.version,
+    metadata: {
+      createdOnDevice: flow.createdOnDevice,
+      lastModifiedOnDevice: flow.lastModifiedOnDevice,
+    },
+  };
+}
+
+/**
+ * Map frontend Flow object to backend-compatible format for UPDATE
+ * Excludes ID (comes from URL path), authorId, and other immutable fields
+ */
+function mapFlowForUpdate(flow: Flow) {
+  return {
+    name: flow.name,
+    description: flow.description,
+    flow: flow.flow,
+    tags: flow.tags || [],
+    category: flow.category,
+    visibility: flow.visibility,
+    status: flow.status,
+    isTemplate: flow.isTemplate,
+    isFavorite: flow.isFavorite,
+    version: flow.version,
+    metadata: {
+      lastModifiedOnDevice: flow.lastModifiedOnDevice,
+    },
+  };
+}
+
+/**
  * Sync flow to backend with automatic retry
  * Non-blocking - returns immediately if offline
  * Uses upsert pattern: try PUT first, if 404 then POST
@@ -50,21 +96,21 @@ export async function syncFlowToBackend(flow: Flow): Promise<BackendResponse<Flo
       // Get stable device identifier
       const deviceId = getDeviceId();
 
-      // Try UPDATE first (PUT)
+      // Try UPDATE first (PUT) - use update mapper
       let response = await fetch(`${BACKEND_URL}/api/flows/${flow.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'x-user-id': deviceId
         },
-        body: JSON.stringify(flow),
+        body: JSON.stringify(mapFlowForUpdate(flow)),
         signal: AbortSignal.timeout(5000) // 5s timeout
       });
 
       // Track if we created a new flow
       let wasCreated = false;
 
-      // If 404 (not found), try CREATE (POST)
+      // If 404 (not found), try CREATE (POST) - use create mapper
       if (response.status === 404) {
         console.log('[backendSync] Flow not found in backend, creating new...');
         response = await fetch(`${BACKEND_URL}/api/flows`, {
@@ -73,7 +119,7 @@ export async function syncFlowToBackend(flow: Flow): Promise<BackendResponse<Flo
             'Content-Type': 'application/json',
             'x-user-id': deviceId
           },
-          body: JSON.stringify(flow),
+          body: JSON.stringify(mapFlowForCreate(flow)),
           signal: AbortSignal.timeout(5000)
         });
         wasCreated = true;

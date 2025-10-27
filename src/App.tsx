@@ -209,13 +209,20 @@ function AppContent() {
           description: `"${name}" has been saved. Autosave is now enabled.`,
         });
       }
+
+      // CRITICAL FIX: Enable autosave after first successful save
+      setState(prev => ({
+        ...prev,
+        autosaveEnabled: true,
+        hasBeenManuallyNamed: true,
+      }));
     } catch (error: any) {
       toast.error('Failed to save flow', {
         description: error.message,
       });
       throw error; // Re-throw to let modal handle it
     }
-  }, [currentFlowId, saveFlow]);
+  }, [currentFlowId, saveFlow, setState]);
 
   // Handle autosave enable from inline rename (Path 2)
   const handleAutosaveEnable = useCallback(() => {

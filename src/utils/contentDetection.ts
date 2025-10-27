@@ -263,6 +263,21 @@ export function shouldShowViewButton(content: string): boolean {
 export function extractPureContent(content: string, format: ContentFormat): string {
   const trimmed = content.trim();
 
+  // CRITICAL FIX: For HTML format, detect full HTML documents FIRST
+  // If content is already a complete HTML document, return it unchanged
+  // This prevents corruption of valid HTML by JSON unwrapping logic
+  if (format === 'html') {
+    const isFullHtmlDocument =
+      /^<!DOCTYPE\s+html/i.test(trimmed) || // DOCTYPE declaration
+      /^<html[\s>]/i.test(trimmed) ||       // Starts with <html>
+      /^<\!--[\s\S]*?-->\s*<html/i.test(trimmed); // Comment then <html>
+
+    if (isFullHtmlDocument) {
+      console.log('[extractPureContent] Detected full HTML document - returning unchanged');
+      return trimmed;
+    }
+  }
+
   // Try to parse as JSON and extract format-specific field
   if (format === 'html' || format === 'markdown') {
     try {
