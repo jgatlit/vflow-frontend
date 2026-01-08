@@ -7,7 +7,10 @@
     "browser-automation": {
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest"],
-      "description": "Official Playwright browser automation - Cross-browser testing, screenshots, and web automation"
+      "description": "Official Playwright browser automation - Cross-browser testing, screenshots, and web automation",
+      "env": {
+        "PLAYWRIGHT_CHROMIUM_ARGS": "--disable-gpu --disable-software-rasterizer --disable-dev-shm-usage --no-sandbox --disable-accelerated-2d-canvas --disable-extensions --disable-background-timer-throttling"
+      }
     }
   }
 }

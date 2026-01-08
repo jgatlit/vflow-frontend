@@ -28,14 +28,27 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: 'off', // Disabled to reduce CPU usage
   },
 
   /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-accelerated-2d-canvas',
+            '--disable-extensions',
+            '--disable-background-timer-throttling',
+          ],
+        },
+      },
     },
 
     {
