@@ -313,7 +313,7 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
                   value={nodeData.maxTokens || 4000}
                   onChange={(e) => handleDataChange('maxTokens', parseInt(e.target.value))}
                   min="1"
-                  max="8000"
+                  max="128000"
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                 />
               </div>

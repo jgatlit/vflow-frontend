@@ -42,7 +42,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'premium',
         description: 'Latest flagship with agent teams capability',
         contextWindow: 200000,
-        maxOutput: 8192,
+        maxOutput: 128000,
         pricing: { input: 5, output: 25 },
         capabilities: { vision: true, tools: true, streaming: true, json: true, extendedThinking: true }
       },
@@ -52,7 +52,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'premium',
         description: 'Most intelligent, effort parameter for cost control',
         contextWindow: 200000,
-        maxOutput: 8192,
+        maxOutput: 64000,
         pricing: { input: 5, output: 25 },
         capabilities: { vision: true, tools: true, streaming: true, json: true, extendedThinking: true }
       },
@@ -62,7 +62,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'flagship',
         description: 'Best coding model, complex agents',
         contextWindow: 200000,
-        maxOutput: 8192,
+        maxOutput: 64000,
         pricing: { input: 3, output: 15 },
         capabilities: { vision: true, tools: true, streaming: true, json: true, extendedThinking: true }
       },
@@ -72,7 +72,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'fast',
         description: 'Fastest responses, near-frontier performance',
         contextWindow: 200000,
-        maxOutput: 65536,
+        maxOutput: 64000,
         pricing: { input: 1, output: 5 },
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
@@ -83,7 +83,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'premium',
         description: 'Enhanced Opus with extended thinking',
         contextWindow: 200000,
-        maxOutput: 8192,
+        maxOutput: 32000,
         pricing: { input: 15, output: 75 },
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
@@ -93,7 +93,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'premium',
         description: 'High intelligence for complex tasks',
         contextWindow: 200000,
-        maxOutput: 8192,
+        maxOutput: 32000,
         pricing: { input: 15, output: 75 },
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
@@ -103,7 +103,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'flagship',
         description: 'Balanced performance',
         contextWindow: 200000,
-        maxOutput: 8192,
+        maxOutput: 64000,
         pricing: { input: 3, output: 15 },
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
@@ -227,7 +227,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'fast',
         description: 'Fast reasoning model',
         contextWindow: 200000,
-        maxOutput: 65536,
+        maxOutput: 100000,
         pricing: { input: 1.1, output: 4.4 },
         capabilities: { tools: true, streaming: false, json: true }
       },
@@ -237,7 +237,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'fast',
         description: 'Budget reasoning, great for math/coding',
         contextWindow: 200000,
-        maxOutput: 65536,
+        maxOutput: 100000,
         pricing: { input: 1.1, output: 4.4 },
         capabilities: { tools: true, streaming: false, json: true }
       },
@@ -248,7 +248,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'flagship',
         description: 'Improved coding, 1M context',
         contextWindow: 1000000,
-        maxOutput: 16384,
+        maxOutput: 32768,
         pricing: { input: 2, output: 8 },
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
@@ -258,7 +258,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'fast',
         description: 'Fast 4.1 variant',
         contextWindow: 1000000,
-        maxOutput: 16384,
+        maxOutput: 32768,
         pricing: { input: 0.4, output: 1.6 },
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
@@ -268,7 +268,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'fast',
         description: 'Most affordable 4.1',
         contextWindow: 1000000,
-        maxOutput: 16384,
+        maxOutput: 32768,
         pricing: { input: 0.1, output: 0.4 },
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
@@ -335,8 +335,8 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
     models: [
       // Gemini 3 Series (Preview - November 2025)
       {
-        id: 'gemini-3.1-pro',
-        name: 'Gemini 3.1 Pro',
+        id: 'gemini-3.1-pro-preview',
+        name: 'Gemini 3.1 Pro Preview',
         tier: 'flagship',
         description: 'Latest stable flagship with enhanced reasoning',
         contextWindow: 1000000,
@@ -463,7 +463,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'fast',
         description: 'Quick facts, news, simple Q&A',
         contextWindow: 128000,
-        maxOutput: 4096,
+        maxOutput: 1000,
         pricing: { input: 1, output: 1 },
         capabilities: { streaming: true, json: true, search: true, citations: true }
       },
@@ -473,7 +473,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'flagship',
         description: 'Complex queries, competitive analysis',
         contextWindow: 200000,
-        maxOutput: 8192,
+        maxOutput: 4000,
         pricing: { input: 3, output: 15 },
         capabilities: { streaming: true, json: true, search: true, citations: true }
       },
@@ -505,7 +505,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         tier: 'premium',
         description: 'Academic research, market analysis',
         contextWindow: 128000,
-        maxOutput: 8192,
+        maxOutput: 4000,
         pricing: { input: 2, output: 8 },
         capabilities: { streaming: true, json: true, search: true, citations: true, deepResearch: true }
       },

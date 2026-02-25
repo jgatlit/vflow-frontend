@@ -291,7 +291,7 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1"
               >
                 <optgroup label="Gemini 3 Series (Preview - Nov 2025)">
-                  <option value="gemini-3.1-pro">Gemini 3.1 Pro (Latest Flagship)</option>
+                  <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (Latest Flagship)</option>
                   <option value="gemini-3-pro-preview">Gemini 3 Pro Preview (Experimental)</option>
                 </optgroup>
                 <optgroup label="Gemini 2.5 Series (Stable)">
@@ -337,7 +337,7 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
               value={nodeData.maxTokens || 2000}
               onChange={(e) => handleDataChange('maxTokens', parseInt(e.target.value))}
               min="1"
-              max="8000"
+              max="65536"
               className="w-full text-sm border border-gray-300 rounded px-2 py-1"
             />
           </div>

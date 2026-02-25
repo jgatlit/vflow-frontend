@@ -88,7 +88,9 @@ export function validateFlowTokenLimits(
     const nodeData = node.data || {};
     const provider = nodeData.provider || node.type;
     const modelId = nodeData.model;
-    const prompt = nodeData.prompt || '';
+    const systemPrompt = nodeData.systemPrompt || '';
+    const userPrompt = nodeData.userPrompt || '';
+    const prompt = systemPrompt + '\n' + userPrompt;
 
     // Resolve variables in prompt
     let resolvedPrompt = prompt;

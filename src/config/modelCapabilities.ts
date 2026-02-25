@@ -46,21 +46,21 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_format',
-    maxOutputTokens: 16384,
+    maxOutputTokens: 32768,
     notes: 'GPT-4.1 with 1M context, improved coding'
   },
   'gpt-4.1-mini': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_format',
-    maxOutputTokens: 16384,
+    maxOutputTokens: 32768,
     notes: 'GPT-4.1 mini variant'
   },
   'gpt-4.1-nano': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_format',
-    maxOutputTokens: 16384,
+    maxOutputTokens: 32768,
     notes: 'GPT-4.1 nano variant'
   },
   // OpenAI Models - GPT-4o Series
@@ -104,7 +104,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_format',
-    maxOutputTokens: 16384,
+    maxOutputTokens: 100000,
     notes: 'Latest mini model with structured output'
   },
   // OpenAI Models - Legacy
@@ -128,7 +128,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 128000,
     notes: 'Latest flagship with agent teams capability'
   },
   // Anthropic Models - Claude 4.5 Series (Latest - November 2025)
@@ -136,21 +136,21 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 64000,
     notes: 'Most intelligent, effort parameter for cost control'
   },
   'claude-sonnet-4-5': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 64000,
     notes: 'Best for complex agents and coding'
   },
   'claude-haiku-4-5': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 65536,
+    maxOutputTokens: 64000,
     notes: 'Fastest Haiku with near-frontier performance'
   },
   // Anthropic Models - Claude 4 Series
@@ -158,21 +158,21 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32000,
     notes: 'Claude Opus 4.1 with extended thinking'
   },
   'claude-opus-4': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32000,
     notes: 'Claude Opus 4 baseline'
   },
   'claude-sonnet-4': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 64000,
     notes: 'Claude Sonnet 4 baseline'
   },
   // Anthropic Models - Claude 3.7 Series
@@ -195,7 +195,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 4096,
     notes: 'Claude 3.5 Sonnet (Legacy - June 2024)'
   },
   // Anthropic Models - Claude 3 Series (Legacy)
@@ -215,7 +215,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   // Google Gemini Models - 3.1 Series (Latest - February 2026)
-  'gemini-3.1-pro': {
+  'gemini-3.1-pro-preview': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_schema',
@@ -302,14 +302,14 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_format',
-    maxOutputTokens: 4096,
+    maxOutputTokens: 1000,
     notes: 'Quick facts, news, simple Q&A with citations'
   },
   'sonar-pro': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_format',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 4000,
     notes: 'Complex queries, competitive analysis, 200K context'
   },
   'sonar-reasoning': {
@@ -330,7 +330,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'response_format',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 4000,
     notes: 'Academic research, market analysis, multi-step retrieval'
   },
 };
