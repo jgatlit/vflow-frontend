@@ -8,10 +8,21 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-railway"]
     },
-    "browser-automation": {
+    "playwright": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"],
-      "description": "Official Playwright browser automation - Cross-browser testing, screenshots, and web automation"
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--browser",
+        "chromium",
+        "--headless",
+        "--no-sandbox",
+        "--isolated"
+      ],
+      "env": {
+        "PLAYWRIGHT_CHROMIUM_ARGS": "--disable-gpu --disable-software-rasterizer --disable-dev-shm-usage --no-sandbox --disable-accelerated-2d-canvas --disable-extensions --disable-background-timer-throttling"
+      }
     },
     "github": {
       "command": "npx",

@@ -53,6 +53,21 @@ const NodePalette = () => {
           </div>
         </div>
 
+        {/* Perplexity Node */}
+        <div
+          className="border-2 border-teal-400 rounded-lg p-3 cursor-move hover:border-teal-600 hover:bg-teal-50 transition-colors"
+          draggable
+          onDragStart={(e) => onDragStart(e, 'perplexity')}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🔍</span>
+            <div>
+              <div className="font-medium text-sm">Perplexity</div>
+              <div className="text-xs text-gray-500">Search + Citations 📚</div>
+            </div>
+          </div>
+        </div>
+
         {/* Notes Node */}
         <div
           className="border-2 border-yellow-400 rounded-lg p-3 cursor-move hover:border-yellow-600 hover:bg-yellow-50 transition-colors"

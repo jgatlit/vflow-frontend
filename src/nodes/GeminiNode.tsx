@@ -290,7 +290,10 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
                 onChange={(e) => handleDataChange('model', e.target.value)}
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1"
               >
-                <optgroup label="Gemini 2.5 Series (Latest)">
+                <optgroup label="Gemini 3 Series (Preview - Nov 2025)">
+                  <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+                </optgroup>
+                <optgroup label="Gemini 2.5 Series (Stable)">
                   <option value="gemini-2.5-pro">Gemini 2.5 Pro (Thinking)</option>
                   <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                   <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
@@ -300,7 +303,7 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
                   <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
                   <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
                 </optgroup>
-                <optgroup label="Gemini 1.5 Series (Deprecated Sept 2025)">
+                <optgroup label="Gemini 1.5 Series (Deprecated)">
                   <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
                   <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                   <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash-8B</option>
@@ -501,9 +504,10 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
 
           {/* Model Info */}
           <div className="mt-2 text-xs text-green-600 bg-green-50 rounded px-2 py-1">
-            {nodeData.model === 'gemini-2.5-pro' && '🧠 2.5 Pro: State-of-the-art thinking model | 1M context'}
-            {nodeData.model === 'gemini-2.5-flash' && '⚡ 2.5 Flash: Best price-performance | 1M context'}
-            {nodeData.model === 'gemini-2.5-flash-lite' && '💨 2.5 Flash-Lite: Cost-efficient | 1M context'}
+            {nodeData.model === 'gemini-3-pro-preview' && '🌟 3 Pro: Most intelligent Gemini, dynamic thinking | 1M context | $2/$12 per 1M'}
+            {nodeData.model === 'gemini-2.5-pro' && '🧠 2.5 Pro: State-of-the-art thinking model | 1M context | $1.25/$10 per 1M'}
+            {nodeData.model === 'gemini-2.5-flash' && '⚡ 2.5 Flash: Best price-performance | 1M context | $0.15/$0.60 per 1M'}
+            {nodeData.model === 'gemini-2.5-flash-lite' && '💨 2.5 Flash-Lite: Cost-efficient | 1M context | $0.075/$0.30 per 1M'}
             {nodeData.model === 'gemini-2.0-flash' && '⚡ 2.0 Flash: Next-gen features | 1M context'}
             {nodeData.model === 'gemini-2.0-flash-exp' && '🔬 2.0 Experimental: Free while in preview | 1M context'}
             {nodeData.model === 'gemini-2.0-flash-lite' && '💨 2.0 Flash-Lite: Fast & efficient | 1M context'}

@@ -2,6 +2,7 @@ import type { NodeTypes } from '@xyflow/react';
 import OpenAINode from './OpenAINode';
 import AnthropicNode from './AnthropicNode';
 import GeminiNode from './GeminiNode';
+import PerplexityNode from './PerplexityNode';
 import NotesNode from './NotesNode';
 import PythonNode from './PythonNode';
 import JavaScriptNode from './JavaScriptNode';
@@ -14,6 +15,7 @@ export const nodeTypes: NodeTypes = {
   openai: OpenAINode,
   anthropic: AnthropicNode,
   gemini: GeminiNode,
+  perplexity: PerplexityNode,
   notes: NotesNode,
   python: PythonNode,
   javascript: JavaScriptNode,
@@ -23,4 +25,4 @@ export const nodeTypes: NodeTypes = {
   'webhook-out': WebhookOutNode,
 };
 
-export { OpenAINode, AnthropicNode, GeminiNode, NotesNode, PythonNode, JavaScriptNode, ToolAugmentedLLMNode, AgentNode, WebhookInNode, WebhookOutNode };
+export { OpenAINode, AnthropicNode, GeminiNode, PerplexityNode, NotesNode, PythonNode, JavaScriptNode, ToolAugmentedLLMNode, AgentNode, WebhookInNode, WebhookOutNode };

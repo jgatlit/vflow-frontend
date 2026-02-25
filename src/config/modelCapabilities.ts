@@ -123,7 +123,14 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     notes: 'JSON mode only, no strict schema enforcement'
   },
 
-  // Anthropic Models - Claude 4.5 Series (Latest)
+  // Anthropic Models - Claude 4.5 Series (Latest - November 2025)
+  'claude-opus-4-5-20251101': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'tool_use',
+    maxOutputTokens: 8192,
+    notes: 'Most intelligent, effort parameter for cost control'
+  },
   'claude-sonnet-4-5-20250929': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
@@ -199,7 +206,15 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     notes: 'Claude 3 Haiku (Legacy)'
   },
 
-  // Google Gemini Models - 2.5 Series (Latest)
+  // Google Gemini Models - 3 Series (Preview - November 2025)
+  'gemini-3-pro-preview': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_schema',
+    maxOutputTokens: 65536,
+    notes: 'Most intelligent Gemini, dynamic thinking, 1M context'
+  },
+  // Google Gemini Models - 2.5 Series (Stable)
   'gemini-2.5-pro': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
@@ -264,6 +279,43 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     structuredOutputMethod: 'response_schema',
     maxOutputTokens: 8192,
     notes: 'Lightweight model with response_schema (Deprecated)'
+  },
+
+  // Perplexity Models - Sonar Series (Search-Augmented)
+  'sonar': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 4096,
+    notes: 'Quick facts, news, simple Q&A with citations'
+  },
+  'sonar-pro': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 8192,
+    notes: 'Complex queries, competitive analysis, 200K context'
+  },
+  'sonar-reasoning': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 4096,
+    notes: 'Logic puzzles, math problems with search'
+  },
+  'sonar-reasoning-pro': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 8192,
+    notes: 'Complex problem-solving, research analysis'
+  },
+  'sonar-deep-research': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_format',
+    maxOutputTokens: 8192,
+    notes: 'Academic research, market analysis, multi-step retrieval'
   },
 };
 

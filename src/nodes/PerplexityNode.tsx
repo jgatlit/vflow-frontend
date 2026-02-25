@@ -5,53 +5,43 @@ import { useFlowStore } from '../store/flowStore';
 import VariableTextarea from '../components/VariableTextarea';
 import { supportsStructuredOutput } from '../config/modelCapabilities';
 import { csvFieldsToJsonSchema, jsonSchemaToCSVFields, jsonSchemaToMarkdown, csvFieldsToMarkdown } from '../utils/formatConversion';
-import { ToolSelector } from '../components/tools/ToolSelector';
-import { ToolConfigModal } from '../components/tools/ToolConfigModal';
-import { AVAILABLE_TOOLS } from '../config/tools';
 
-export interface OpenAINodeData {
+export interface PerplexityNodeData {
   title?: string;
   model: string;
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
   userPrompt: string;
-  compactMode?: boolean;
-  outputVariable?: string;
-  // Structured output fields
+
+  // Search Focus Mode (Core Feature)
+  searchFocus: 'web' | 'academic' | 'social' | 'finance';
+
+  // Search Configuration
+  searchContextSize: 'low' | 'medium' | 'high';
+  returnCitations: boolean;
+  searchRecencyFilter?: 'hour' | 'day' | 'week' | 'month' | 'year';
+
+  // Domain Filtering
+  searchDomainFilter?: string;  // comma-separated domains
+
+  // Standard fields
   outputFormat?: 'text' | 'json' | 'csv';
-  jsonSchema?: string;  // JSON schema as string
-  csvFields?: string;   // Comma-separated field names
-  // Tool support
-  toolsEnabled?: boolean;
-  enabledTools?: string[];
-  toolConfigs?: Record<string, any>;
-  // Agent mode
-  agentMode?: boolean;
-  maxSteps?: number;
-  // Bypass toggle
+  jsonSchema?: string;
+  csvFields?: string;
+  outputVariable?: string;
+  compactMode?: boolean;
   bypassed?: boolean;
 }
 
-const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
-  const nodeData = data as unknown as OpenAINodeData;
+const PerplexityNode = memo(({ id, data, selected }: NodeProps) => {
+  const nodeData = data as unknown as PerplexityNodeData;
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
   const previousOutputFormatRef = useRef<string | undefined>(nodeData.outputFormat);
   const [copied, setCopied] = useState(false);
-  const [showToolSelector, setShowToolSelector] = useState(false);
-  const [configuringTool, setConfiguringTool] = useState<string | null>(null);
 
-  const handleDataChange = (field: keyof OpenAINodeData, value: string | number | boolean) => {
+  const handleDataChange = (field: keyof PerplexityNodeData, value: string | number | boolean) => {
     updateNodeData(id, { [field]: value });
-  };
-
-  const handleToolToggle = (toolId: string) => {
-    const isEnabled = (nodeData.enabledTools || []).includes(toolId);
-    const newEnabledTools = isEnabled
-      ? (nodeData.enabledTools || []).filter(id => id !== toolId)
-      : [...(nodeData.enabledTools || []), toolId];
-
-    updateNodeData(id, { enabledTools: newEnabledTools });
   };
 
   const handleCopyMarkdown = async () => {
@@ -133,21 +123,21 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
     <>
       <NodeResizer
         minWidth={400}
-        minHeight={300}
+        minHeight={350}
         isVisible={selected}
       />
-      <div className={`bg-white rounded-lg shadow-lg border-2 border-blue-500 p-4 ${
+      <div className={`bg-white rounded-lg shadow-lg border-2 border-teal-500 p-4 ${
         nodeData.bypassed ? 'opacity-60 ring-2 ring-gray-400' : ''
       }`}>
         {/* Header with Editable Title */}
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">🤖</span>
+            <span className="text-2xl">🔍</span>
             <input
               type="text"
-              value={nodeData.title || 'OpenAI Node'}
+              value={nodeData.title || 'Perplexity Node'}
               onChange={(e) => handleDataChange('title', e.target.value)}
-              className="font-semibold text-lg flex-1 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-300 rounded px-1"
+              className="font-semibold text-lg flex-1 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-teal-300 rounded px-1"
               placeholder="Node Title"
             />
             <button
@@ -155,31 +145,15 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
               className={`px-2 py-1 text-xs rounded transition-colors ${
                 nodeData.bypassed
                   ? 'bg-gray-400 text-white'
-                  : 'bg-green-500 text-white hover:bg-green-600'
+                  : 'bg-teal-500 text-white hover:bg-teal-600'
               }`}
               title={nodeData.bypassed ? 'Node is bypassed - click to activate' : 'Node is active - click to bypass'}
             >
               {nodeData.bypassed ? '⏸ Bypassed' : '▶ Active'}
             </button>
             <button
-              onClick={() => {
-                handleDataChange('toolsEnabled', !nodeData.toolsEnabled);
-                if (nodeData.toolsEnabled) {
-                  handleDataChange('agentMode', false);
-                }
-              }}
-              className={`text-xs px-2 py-1 rounded transition-colors ${
-                nodeData.toolsEnabled
-                  ? 'bg-teal-100 text-teal-700 hover:bg-teal-200'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-              title={nodeData.toolsEnabled ? "Disable tools" : "Enable tools"}
-            >
-              {nodeData.toolsEnabled ? '🔧 Tools ON' : '🔧 Add Tools'}
-            </button>
-            <button
               onClick={() => handleDataChange('compactMode', !nodeData.compactMode)}
-              className="text-xs px-2 py-1 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+              className="text-xs px-2 py-1 bg-teal-50 hover:bg-teal-100 rounded transition-colors"
               title={nodeData.compactMode ? "Show all settings" : "Compact view"}
             >
               {nodeData.compactMode ? '📋 Expand' : '📝 Compact'}
@@ -187,35 +161,6 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
           </div>
           <div className="text-xs text-gray-500 ml-10">ID: {id}</div>
         </div>
-
-        {/* Tool Bar - Only visible when tools enabled */}
-        {nodeData.toolsEnabled && (
-          <div className="mb-3 p-2 bg-teal-50 rounded border border-teal-200">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-semibold text-teal-800">🔧 Available Tools:</span>
-              <button
-                onClick={() => setShowToolSelector(true)}
-                className="text-xs px-2 py-1 bg-white hover:bg-teal-100 rounded border border-teal-300 transition-colors"
-              >
-                + Select Tools
-              </button>
-            </div>
-            {nodeData.enabledTools && nodeData.enabledTools.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {nodeData.enabledTools.map((toolId) => (
-                  <span
-                    key={toolId}
-                    className="px-2 py-0.5 bg-white rounded text-xs font-mono text-teal-700 border border-teal-200"
-                  >
-                    {toolId}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="text-xs text-gray-500 italic">No tools selected</div>
-            )}
-          </div>
-        )}
 
         {/* Conditional: Compact or Full View */}
         {nodeData.compactMode ? (
@@ -229,6 +174,13 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
               <span className="font-medium">Config:</span>
               <span>Temp {nodeData.temperature} • {nodeData.maxTokens} tokens</span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Search Focus:</span>
+              <span className="capitalize">{nodeData.searchFocus}</span>
+              <span className="text-xs px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full">
+                {nodeData.searchContextSize} context
+              </span>
+            </div>
             <div className="text-xs text-gray-500 mt-2">
               Click 📋 Expand to edit settings
             </div>
@@ -236,41 +188,27 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
         ) : (
           /* Full View - All Configs */
           <div className="space-y-3">
-            {/* Model and Temperature Row */}
+            {/* Model and Temperature */}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs font-medium text-gray-600 block mb-1">
                   Model
                 </label>
                 <select
-                  value={nodeData.model || 'gpt-4o'}
+                  value={nodeData.model || 'sonar'}
                   onChange={(e) => handleDataChange('model', e.target.value)}
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                 >
-                  <optgroup label="GPT-5 Series (Flagship - 400K Context)">
-                    <option value="gpt-5">GPT-5 (Flagship)</option>
-                    <option value="gpt-5-mini">GPT-5 Mini</option>
-                    <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
+                  <optgroup label="Sonar Series">
+                    <option value="sonar">Sonar</option>
+                    <option value="sonar-pro">Sonar Pro</option>
                   </optgroup>
-                  <optgroup label="Reasoning Models (o-Series)">
-                    <option value="o3-pro">o3-pro (Extended Reasoning)</option>
-                    <option value="o3">o3 (Reasoning)</option>
-                    <option value="o3-mini">o3-mini (Fast Reasoning)</option>
-                    <option value="o4-mini">o4-mini (Budget Reasoning)</option>
+                  <optgroup label="Reasoning Series">
+                    <option value="sonar-reasoning">Sonar Reasoning</option>
+                    <option value="sonar-reasoning-pro">Sonar Reasoning Pro</option>
                   </optgroup>
-                  <optgroup label="GPT-4.1 Series (1M Context)">
-                    <option value="gpt-4.1">GPT-4.1</option>
-                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-                    <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
-                  </optgroup>
-                  <optgroup label="GPT-4o Series (128K Context)">
-                    <option value="gpt-4o">GPT-4o</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                    <option value="gpt-4o-audio-preview">GPT-4o Audio</option>
-                  </optgroup>
-                  <optgroup label="Legacy Models">
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  <optgroup label="Deep Research">
+                    <option value="sonar-deep-research">Sonar Deep Research</option>
                   </optgroup>
                 </select>
               </div>
@@ -293,43 +231,181 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
             {/* Max Tokens */}
             <div>
               <label className="text-xs font-medium text-gray-600 block mb-1">
-                Max Tokens
+                Max Output Tokens
               </label>
               <input
                 type="number"
-                value={nodeData.maxTokens || 1000}
+                value={nodeData.maxTokens || 2000}
                 onChange={(e) => handleDataChange('maxTokens', parseInt(e.target.value))}
                 min="1"
-                max="4000"
+                max="8000"
                 className="w-full text-sm border border-gray-300 rounded px-2 py-1"
               />
             </div>
 
-            {/* System Prompt - Always Visible */}
+            {/* Search Focus Mode */}
+            <div className="border border-teal-200 rounded p-3 bg-teal-50/50">
+              <div className="text-xs font-semibold text-teal-800 mb-2 flex items-center gap-1">
+                <span>🔍</span>
+                <span>Search Focus Mode</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-2 p-2 border border-teal-200 rounded bg-white hover:bg-teal-50 cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name={`${id}-search-focus`}
+                    value="web"
+                    checked={nodeData.searchFocus === 'web'}
+                    onChange={(e) => handleDataChange('searchFocus', e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-700">Web</div>
+                    <div className="text-xs text-gray-500">General web search</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 p-2 border border-teal-200 rounded bg-white hover:bg-teal-50 cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name={`${id}-search-focus`}
+                    value="academic"
+                    checked={nodeData.searchFocus === 'academic'}
+                    onChange={(e) => handleDataChange('searchFocus', e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-700">Academic</div>
+                    <div className="text-xs text-gray-500">Scholarly papers</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 p-2 border border-teal-200 rounded bg-white hover:bg-teal-50 cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name={`${id}-search-focus`}
+                    value="social"
+                    checked={nodeData.searchFocus === 'social'}
+                    onChange={(e) => handleDataChange('searchFocus', e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-700">Social</div>
+                    <div className="text-xs text-gray-500">Reddit, X, forums</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 p-2 border border-teal-200 rounded bg-white hover:bg-teal-50 cursor-pointer transition-colors">
+                  <input
+                    type="radio"
+                    name={`${id}-search-focus`}
+                    value="finance"
+                    checked={nodeData.searchFocus === 'finance'}
+                    onChange={(e) => handleDataChange('searchFocus', e.target.value)}
+                    className="w-4 h-4"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-700">Finance</div>
+                    <div className="text-xs text-gray-500">SEC filings</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Search Options */}
+            <div className="border border-teal-200 rounded p-3 bg-teal-50/50">
+              <div className="text-xs font-semibold text-teal-800 mb-2 flex items-center gap-1">
+                <span>⚙️</span>
+                <span>Search Options</span>
+              </div>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">
+                      Context Size
+                    </label>
+                    <select
+                      value={nodeData.searchContextSize || 'medium'}
+                      onChange={(e) => handleDataChange('searchContextSize', e.target.value as 'low' | 'medium' | 'high')}
+                      className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                    >
+                      <option value="low">Low (faster, cheaper)</option>
+                      <option value="medium">Medium (balanced)</option>
+                      <option value="high">High (comprehensive)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">
+                      Recency Filter
+                    </label>
+                    <select
+                      value={nodeData.searchRecencyFilter || ''}
+                      onChange={(e) => handleDataChange('searchRecencyFilter', e.target.value)}
+                      className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                    >
+                      <option value="">Any time</option>
+                      <option value="hour">Past hour</option>
+                      <option value="day">Past day</option>
+                      <option value="week">Past week</option>
+                      <option value="month">Past month</option>
+                      <option value="year">Past year</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={nodeData.returnCitations !== false}
+                    onChange={(e) => handleDataChange('returnCitations', e.target.checked)}
+                    className="w-4 h-4"
+                    id={`${id}-citations`}
+                  />
+                  <label htmlFor={`${id}-citations`} className="text-xs font-medium text-gray-600">
+                    Return Citations (source attribution)
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Domain Filter */}
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">
+                Domain Filter (comma-separated, max 10)
+              </label>
+              <input
+                type="text"
+                value={nodeData.searchDomainFilter || ''}
+                onChange={(e) => handleDataChange('searchDomainFilter', e.target.value)}
+                className="w-full text-sm font-mono border border-gray-300 rounded px-2 py-1"
+                placeholder="arxiv.org, nature.com, -pinterest.com"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                Prefix with "-" to exclude domains. Leave empty for no filtering.
+              </div>
+            </div>
+
+            {/* System Prompt */}
             <VariableTextarea
-              label="System Prompt"
+              label="System Instruction"
               value={nodeData.systemPrompt || ''}
               onChange={(value) => handleDataChange('systemPrompt', value)}
-              placeholder="You are a helpful assistant..."
+              placeholder="You are a helpful AI assistant with real-time search capabilities..."
               minHeight="60px"
             />
 
-            {/* User Prompt - Always Visible */}
+            {/* User Prompt */}
             <VariableTextarea
               label="User Prompt"
               value={nodeData.userPrompt || ''}
               onChange={(value) => handleDataChange('userPrompt', value)}
-              placeholder="{{input}}&#10;&#10;Analyze this nodeData..."
+              placeholder="{{input}}&#10;&#10;Research and analyze..."
               minHeight="100px"
             />
 
             {/* Structured Output - Only for supported models */}
             {supportsStructuredOutput(nodeData.model) && (
-              <div className="border border-blue-200 rounded p-3 bg-blue-50/50">
-                <div className="text-xs font-semibold text-blue-800 mb-2 flex items-center gap-1">
+              <div className="border border-teal-200 rounded p-3 bg-teal-50/50">
+                <div className="text-xs font-semibold text-teal-800 mb-2 flex items-center gap-1">
                   <span>📊</span>
                   <span>Structured Output</span>
-                  <span className="text-blue-600 font-normal">(optional)</span>
+                  <span className="text-teal-600 font-normal">(optional)</span>
                 </div>
 
                 {/* Output Format Selector */}
@@ -358,7 +434,7 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
                       {nodeData.jsonSchema && nodeData.jsonSchema.trim() && (
                         <button
                           onClick={handleCopyMarkdown}
-                          className="text-xs px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors flex items-center gap-1"
+                          className="text-xs px-2 py-0.5 bg-teal-100 hover:bg-teal-200 text-teal-700 rounded transition-colors flex items-center gap-1"
                           title="Copy markdown structure for prompt"
                         >
                           {copied ? '✓ Copied!' : '📋 Copy Structure'}
@@ -387,7 +463,7 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
                       {nodeData.csvFields && nodeData.csvFields.trim() && (
                         <button
                           onClick={handleCopyMarkdown}
-                          className="text-xs px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors flex items-center gap-1"
+                          className="text-xs px-2 py-0.5 bg-teal-100 hover:bg-teal-200 text-teal-700 rounded transition-colors flex items-center gap-1"
                           title="Copy markdown structure for prompt"
                         >
                           {copied ? '✓ Copied!' : '📋 Copy Structure'}
@@ -399,7 +475,7 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
                       value={nodeData.csvFields || ''}
                       onChange={(e) => handleDataChange('csvFields', e.target.value)}
                       className="w-full text-sm font-mono border border-gray-300 rounded px-2 py-1"
-                      placeholder="name, email, score, category"
+                      placeholder="topic, source, date, summary"
                     />
                     <div className="text-xs text-gray-500 mt-1">
                       Output will be converted from JSON to CSV format
@@ -410,71 +486,43 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
             )}
 
             {/* Output Reference Help */}
-            <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-gray-600">
+            <div className="mt-3 p-2 bg-teal-50 rounded text-xs text-gray-600">
               <div className="flex items-center gap-1 mb-1">
                 <span className="font-semibold">💡 Output:</span>
                 <span>Reference using</span>
-                <span className="font-mono text-blue-700">{'{{'}</span>
+                <span className="font-mono text-teal-700">{'{{'}</span>
                 <input
                   type="text"
                   value={nodeData.outputVariable || id}
                   onChange={(e) => handleDataChange('outputVariable', e.target.value)}
-                  className="bg-white px-1 py-0.5 rounded font-mono text-blue-700 border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 hover:border-blue-300 transition-colors min-w-[4ch]"
+                  className="bg-white px-1 py-0.5 rounded font-mono text-teal-700 border border-teal-200 focus:outline-none focus:ring-2 focus:ring-teal-400 hover:border-teal-300 transition-colors min-w-[4ch]"
                   placeholder={id}
                   title="Click to edit output variable name"
                   style={{ width: `${Math.max(4, (nodeData.outputVariable || id).length)}ch` }}
                 />
-                <span className="font-mono text-blue-700">{'}}'}</span>
+                <span className="font-mono text-teal-700">{'}}'}</span>
               </div>
 
               {/* Show field-specific variables for JSON output */}
               {nodeData.outputFormat === 'json' && (
-                <div className="mt-2 pl-4 border-l-2 border-blue-300">
-                  <div className="text-blue-700 font-semibold mb-1">Individual fields available as:</div>
-                  <div className="font-mono text-xs text-blue-600 space-y-0.5">
+                <div className="mt-2 pl-4 border-l-2 border-teal-300">
+                  <div className="text-teal-700 font-semibold mb-1">Individual fields available as:</div>
+                  <div className="font-mono text-xs text-teal-600 space-y-0.5">
                     <div>{`{{${nodeData.outputVariable || id}.fieldName}}`}</div>
-                    <div className="text-gray-500 italic">Example: {`{{${nodeData.outputVariable || id}.name}}`}, {`{{${nodeData.outputVariable || id}.score}}`}</div>
+                    <div className="text-gray-500 italic">Example: {`{{${nodeData.outputVariable || id}.topic}}`}, {`{{${nodeData.outputVariable || id}.summary}}`}</div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Agent Mode - Only available when tools are enabled */}
-            {nodeData.toolsEnabled && (
-              <div className="border border-purple-200 rounded p-3 bg-purple-50/50 space-y-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={nodeData.agentMode || false}
-                    onChange={(e) => handleDataChange('agentMode', e.target.checked)}
-                    className="w-4 h-4"
-                    id={`${id}-agent-mode`}
-                  />
-                  <label htmlFor={`${id}-agent-mode`} className="text-xs font-semibold text-purple-800">
-                    🤖 Agent Mode (multi-step reasoning)
-                  </label>
-                </div>
-
-                {nodeData.agentMode && (
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">
-                      Max Steps
-                    </label>
-                    <input
-                      type="number"
-                      value={nodeData.maxSteps || 5}
-                      onChange={(e) => handleDataChange('maxSteps', parseInt(e.target.value))}
-                      min="1"
-                      max="20"
-                      className="w-full text-sm border border-gray-300 rounded px-2 py-1"
-                    />
-                    <div className="text-xs text-gray-500 mt-1">
-                      Agent will perform up to {nodeData.maxSteps || 5} reasoning steps
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Model Info */}
+            <div className="mt-2 text-xs text-teal-600 bg-teal-50 rounded px-2 py-1">
+              {nodeData.model === 'sonar' && '⚡ Sonar: $1/$1 per 1M | Quick facts, news, simple Q&A'}
+              {nodeData.model === 'sonar-pro' && '🔍 Sonar Pro: $3/$15 per 1M | Complex queries, competitive analysis | 200K context'}
+              {nodeData.model === 'sonar-reasoning' && '🧠 Sonar Reasoning: $1/$5 per 1M | Logic puzzles, math problems'}
+              {nodeData.model === 'sonar-reasoning-pro' && '🎯 Sonar Reasoning Pro: $2/$8 per 1M | Complex problem-solving, research'}
+              {nodeData.model === 'sonar-deep-research' && '🔬 Sonar Deep Research: $2/$8 per 1M + search fees | Academic research, deep analysis'}
+            </div>
           </div>
         )}
       </div>
@@ -482,50 +530,19 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
       <Handle
         type="target"
         position={Position.Top}
-        className="!w-4 !h-4 !bg-blue-500 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all"
+        className="!w-4 !h-4 !bg-teal-500 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all"
         style={{ zIndex: 10 }}
       />
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!w-4 !h-4 !bg-blue-500 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all"
+        className="!w-4 !h-4 !bg-teal-500 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all"
         style={{ zIndex: 10 }}
       />
-
-      {/* Tool Selector Modal */}
-      {showToolSelector && (
-        <ToolSelector
-          availableTools={AVAILABLE_TOOLS}
-          selectedToolIds={nodeData.enabledTools || []}
-          onToggle={handleToolToggle}
-          onConfigure={(toolId) => {
-            setShowToolSelector(false);
-            setConfiguringTool(toolId);
-          }}
-          onClose={() => setShowToolSelector(false)}
-        />
-      )}
-
-      {/* Tool Config Modal */}
-      {configuringTool && (
-        <ToolConfigModal
-          tool={AVAILABLE_TOOLS.find(t => t.id === configuringTool)!}
-          existingConfig={nodeData.toolConfigs?.[configuringTool]}
-          onSave={(config) => {
-            const newToolConfigs = {
-              ...(nodeData.toolConfigs || {}),
-              [configuringTool]: config
-            };
-            updateNodeData(id, { toolConfigs: newToolConfigs });
-            setConfiguringTool(null);
-          }}
-          onClose={() => setConfiguringTool(null)}
-        />
-      )}
     </>
   );
 });
 
-OpenAINode.displayName = 'OpenAINode';
+PerplexityNode.displayName = 'PerplexityNode';
 
-export default OpenAINode;
+export default PerplexityNode;

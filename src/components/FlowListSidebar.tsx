@@ -4,6 +4,7 @@ import { db, getAllFlows, searchFlows } from '../db/database';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Trash2 } from 'lucide-react';
 import { PinButton } from './PinButton';
+import { Badge } from './ui/badge';
 import { useFlowStore } from '../store/flowStore';
 
 interface FlowListSidebarProps {
@@ -273,9 +274,9 @@ const FlowListSidebar = ({ isOpen, currentFlowId, onLoadFlow, onNewFlow, onClose
 
                   {/* Metadata */}
                   <div className="flex items-center gap-3 text-xs text-gray-500">
-                    <span title="Node count">
-                      🔵 {flow.flow?.nodes?.length || 0}
-                    </span>
+                    <Badge variant="secondary" title="Node count">
+                      {flow.flow?.nodes?.length ?? 0} nodes
+                    </Badge>
                     <span title="Execution count">
                       ▶️ {flow.executionCount || 0}
                     </span>
