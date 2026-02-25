@@ -258,19 +258,20 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
                   Model
                 </label>
                 <select
-                  value={nodeData.model || 'claude-sonnet-4-5-20250929'}
+                  value={nodeData.model || 'claude-sonnet-4-5'}
                   onChange={(e) => handleDataChange('model', e.target.value)}
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                 >
                   <optgroup label="Claude 4.5 Series (Latest - Nov 2025)">
-                    <option value="claude-opus-4-5-20251101">Claude Opus 4.5 (Most Intelligent)</option>
-                    <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (Best Coding)</option>
-                    <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Fastest)</option>
+                    <option value="claude-opus-4-6">Claude Opus 4.6 (Agent Teams)</option>
+                    <option value="claude-opus-4-5">Claude Opus 4.5 (Most Intelligent)</option>
+                    <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (Best Coding)</option>
+                    <option value="claude-haiku-4-5">Claude Haiku 4.5 (Fastest)</option>
                   </optgroup>
                   <optgroup label="Claude 4 Series">
-                    <option value="claude-opus-4-1-20250710">Claude Opus 4.1</option>
-                    <option value="claude-opus-4-20250514">Claude Opus 4</option>
-                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                    <option value="claude-opus-4-1">Claude Opus 4.1</option>
+                    <option value="claude-opus-4">Claude Opus 4</option>
+                    <option value="claude-sonnet-4">Claude Sonnet 4</option>
                   </optgroup>
                   <optgroup label="Claude 3.7 Series">
                     <option value="claude-sonnet-3-7-20250219">Claude 3.7 Sonnet</option>

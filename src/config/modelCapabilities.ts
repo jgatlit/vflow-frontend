@@ -123,22 +123,30 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     notes: 'JSON mode only, no strict schema enforcement'
   },
 
+  // Anthropic Models - Claude 4.6 Series (Latest - February 2026)
+  'claude-opus-4-6': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'tool_use',
+    maxOutputTokens: 8192,
+    notes: 'Latest flagship with agent teams capability'
+  },
   // Anthropic Models - Claude 4.5 Series (Latest - November 2025)
-  'claude-opus-4-5-20251101': {
+  'claude-opus-4-5': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
     maxOutputTokens: 8192,
     notes: 'Most intelligent, effort parameter for cost control'
   },
-  'claude-sonnet-4-5-20250929': {
+  'claude-sonnet-4-5': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
     maxOutputTokens: 8192,
     notes: 'Best for complex agents and coding'
   },
-  'claude-haiku-4-5-20251001': {
+  'claude-haiku-4-5': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
@@ -146,21 +154,21 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     notes: 'Fastest Haiku with near-frontier performance'
   },
   // Anthropic Models - Claude 4 Series
-  'claude-opus-4-1-20250710': {
+  'claude-opus-4-1': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
     maxOutputTokens: 8192,
     notes: 'Claude Opus 4.1 with extended thinking'
   },
-  'claude-opus-4-20250514': {
+  'claude-opus-4': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
     maxOutputTokens: 8192,
     notes: 'Claude Opus 4 baseline'
   },
-  'claude-sonnet-4-20250514': {
+  'claude-sonnet-4': {
     supportsStructuredOutput: true,
     supportsJsonMode: true,
     structuredOutputMethod: 'tool_use',
@@ -206,6 +214,14 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     notes: 'Claude 3 Haiku (Legacy)'
   },
 
+  // Google Gemini Models - 3.1 Series (Latest - February 2026)
+  'gemini-3.1-pro': {
+    supportsStructuredOutput: true,
+    supportsJsonMode: true,
+    structuredOutputMethod: 'response_schema',
+    maxOutputTokens: 65536,
+    notes: 'Latest stable flagship, enhanced reasoning, 1M context'
+  },
   // Google Gemini Models - 3 Series (Preview - November 2025)
   'gemini-3-pro-preview': {
     supportsStructuredOutput: true,

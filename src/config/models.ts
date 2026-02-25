@@ -33,11 +33,21 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
     name: 'Anthropic',
     icon: '🧠',
     color: 'purple',
-    defaultModel: 'claude-sonnet-4-5-20250929',
+    defaultModel: 'claude-sonnet-4-5',
     models: [
       // Claude 4.5 Series (Latest - November 2025)
       {
-        id: 'claude-opus-4-5-20251101',
+        id: 'claude-opus-4-6',
+        name: 'Claude Opus 4.6',
+        tier: 'premium',
+        description: 'Latest flagship with agent teams capability',
+        contextWindow: 200000,
+        maxOutput: 8192,
+        pricing: { input: 5, output: 25 },
+        capabilities: { vision: true, tools: true, streaming: true, json: true, extendedThinking: true }
+      },
+      {
+        id: 'claude-opus-4-5',
         name: 'Claude Opus 4.5',
         tier: 'premium',
         description: 'Most intelligent, effort parameter for cost control',
@@ -47,7 +57,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         capabilities: { vision: true, tools: true, streaming: true, json: true, extendedThinking: true }
       },
       {
-        id: 'claude-sonnet-4-5-20250929',
+        id: 'claude-sonnet-4-5',
         name: 'Claude Sonnet 4.5',
         tier: 'flagship',
         description: 'Best coding model, complex agents',
@@ -57,7 +67,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         capabilities: { vision: true, tools: true, streaming: true, json: true, extendedThinking: true }
       },
       {
-        id: 'claude-haiku-4-5-20251001',
+        id: 'claude-haiku-4-5',
         name: 'Claude Haiku 4.5',
         tier: 'fast',
         description: 'Fastest responses, near-frontier performance',
@@ -68,7 +78,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
       },
       // Claude 4 Series
       {
-        id: 'claude-opus-4-1-20250710',
+        id: 'claude-opus-4-1',
         name: 'Claude Opus 4.1',
         tier: 'premium',
         description: 'Enhanced Opus with extended thinking',
@@ -78,7 +88,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
       {
-        id: 'claude-opus-4-20250514',
+        id: 'claude-opus-4',
         name: 'Claude Opus 4',
         tier: 'premium',
         description: 'High intelligence for complex tasks',
@@ -88,7 +98,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
         capabilities: { vision: true, tools: true, streaming: true, json: true }
       },
       {
-        id: 'claude-sonnet-4-20250514',
+        id: 'claude-sonnet-4',
         name: 'Claude Sonnet 4',
         tier: 'flagship',
         description: 'Balanced performance',
@@ -324,6 +334,16 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
     defaultModel: 'gemini-2.5-flash',
     models: [
       // Gemini 3 Series (Preview - November 2025)
+      {
+        id: 'gemini-3.1-pro',
+        name: 'Gemini 3.1 Pro',
+        tier: 'flagship',
+        description: 'Latest stable flagship with enhanced reasoning',
+        contextWindow: 1000000,
+        maxOutput: 65536,
+        pricing: { input: 2, output: 12 },
+        capabilities: { vision: true, tools: true, streaming: true, json: true, extendedThinking: true }
+      },
       {
         id: 'gemini-3-pro-preview',
         name: 'Gemini 3 Pro Preview',

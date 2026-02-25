@@ -18,6 +18,7 @@ import type { ExecutionResult } from './utils/executionEngine';
 import { useFlowStore } from './store/flowStore';
 import { useFlowPersistence } from './hooks/useFlowPersistence';
 import { TraceCacheProvider } from './contexts/TraceCacheContext';
+import { validateFlowTokenLimits } from './utils/tokenEstimator';
 import { loadExecutionHistory, saveExecutionWithTrace } from './db/database';
 import { fetchExecutionHistory, completeBackendExecution, type ExecutionHistoryItem } from './services/executionService';
 import { syncFlowsFromBackend, startPeriodicSync } from './services/flowSyncService';
@@ -382,7 +383,20 @@ function AppContent() {
 
   const handleExecute = useCallback(async (inputVariables: Record<string, string>) => {
     if (nodes.length === 0) {
-      alert('No nodes to execute');
+      toast.warning('No nodes to execute');
+      return;
+    }
+
+    // Pre-flight token validation
+    const tokenValidation = validateFlowTokenLimits(nodes, inputVariables);
+    if (!tokenValidation.isValid) {
+      const violations = tokenValidation.violations;
+      const firstViolation = violations[0];
+
+      toast.error('Context window exceeded', {
+        description: `Node "${firstViolation.nodeType}" with model "${firstViolation.modelName}" exceeds context limit (${firstViolation.estimatedTokens.toLocaleString()} tokens estimated vs ${firstViolation.limit.toLocaleString()} limit). ${firstViolation.suggestions.length > 0 ? 'Try: ' + firstViolation.suggestions.join(', ') : 'Reduce input size or use a model with a larger context window.'}`,
+        duration: 8000,
+      });
       return;
     }
 
@@ -448,7 +462,7 @@ function AppContent() {
 
     } catch (error: any) {
       console.error('[App] Execution failed:', error);
-      alert(`Execution failed: ${error.message}`);
+      toast.error('Execution failed', { description: error.message });
       setExecutionStatus('Failed');
       setRateLimitInfo(null);
     } finally {
