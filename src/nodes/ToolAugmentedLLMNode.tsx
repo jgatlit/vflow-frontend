@@ -218,7 +218,7 @@ const ToolAugmentedLLMNode = memo(({ id, data, selected }: NodeProps) => {
                 </label>
                 <input
                   type="text"
-                  value={nodeData.model || 'claude-sonnet-4-5-20250929'}
+                  value={nodeData.model || 'claude-sonnet-4-5'}
                   onChange={(e) => updateNodeData(id, { model: e.target.value })}
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                   placeholder="Model ID"

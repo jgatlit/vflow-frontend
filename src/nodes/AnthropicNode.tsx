@@ -262,28 +262,9 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
                   onChange={(e) => handleDataChange('model', e.target.value)}
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                 >
-                  <optgroup label="Claude 4.5 Series (Latest - Nov 2025)">
-                    <option value="claude-opus-4-6">Claude Opus 4.6 (Agent Teams)</option>
-                    <option value="claude-opus-4-5">Claude Opus 4.5 (Most Intelligent)</option>
-                    <option value="claude-sonnet-4-5">Claude Sonnet 4.5 (Best Coding)</option>
-                    <option value="claude-haiku-4-5">Claude Haiku 4.5 (Fastest)</option>
-                  </optgroup>
-                  <optgroup label="Claude 4 Series">
-                    <option value="claude-opus-4-1">Claude Opus 4.1</option>
-                    <option value="claude-opus-4">Claude Opus 4</option>
-                    <option value="claude-sonnet-4">Claude Sonnet 4</option>
-                  </optgroup>
-                  <optgroup label="Claude 3.7 Series">
-                    <option value="claude-sonnet-3-7-20250219">Claude 3.7 Sonnet</option>
-                  </optgroup>
-                  <optgroup label="Claude 3.5 Series (Legacy)">
-                    <option value="claude-sonnet-3-5-20241022">Claude 3.5 Sonnet</option>
-                    <option value="claude-sonnet-3-5-20240620">Claude 3.5 Sonnet (June)</option>
-                  </optgroup>
-                  <optgroup label="Claude 3 Series (Legacy)">
-                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                    <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-                  </optgroup>
+                  <option value="claude-opus-4-6">Opus 4.6 — Premium Agent & Research</option>
+                  <option value="claude-sonnet-4-5">Sonnet 4.5 — Coding & General Purpose</option>
+                  <option value="claude-haiku-4-5">Haiku 4.5 — Fast Chat & Interactive</option>
                 </select>
               </div>
               <div>
@@ -511,16 +492,9 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
 
             {/* Model Info */}
             <div className="mt-2 text-xs text-purple-600 bg-purple-50 rounded px-2 py-1">
-              {nodeData.model === 'claude-opus-4-5-20251101' && '🧠 Opus 4.5: Most intelligent | $5/$25 per 1M | 200K context | Effort parameter'}
-              {nodeData.model === 'claude-sonnet-4-5-20250929' && '⚡ Sonnet 4.5: Best coding | $3/$15 per 1M | 200K context'}
-              {nodeData.model === 'claude-haiku-4-5-20251001' && '💨 Haiku 4.5: Fastest | $1/$5 per 1M | 200K context'}
-              {nodeData.model?.startsWith('claude-opus-4-1') && '🧠 Opus 4.1: $15/$75 per 1M | 200K context'}
-              {nodeData.model?.startsWith('claude-opus-4-2') && '🧠 Opus 4: $15/$75 per 1M | 200K context'}
-              {nodeData.model?.startsWith('claude-sonnet-4-2') && '⚡ Sonnet 4: $3/$15 per 1M | 200K context'}
-              {nodeData.model?.startsWith('claude-sonnet-3-7') && '⚡ Sonnet 3.7: $3/$15 per 1M | 200K context'}
-              {nodeData.model?.startsWith('claude-sonnet-3-5') && '⚡ Sonnet 3.5: $3/$15 per 1M | 200K context (Legacy)'}
-              {nodeData.model?.startsWith('claude-3-opus') && '🧠 Opus 3: $15/$75 per 1M | 200K context (Legacy)'}
-              {nodeData.model?.startsWith('claude-3-haiku') && '💨 Haiku 3: $0.25/$1.25 per 1M | 200K context (Legacy)'}
+              {nodeData.model === 'claude-opus-4-6' && 'Opus 4.6: Latest flagship, 128K output | 200K context | $15/$75 per 1M'}
+              {nodeData.model === 'claude-sonnet-4-5' && 'Sonnet 4.5: Best coding & general purpose | 200K context | $3/$15 per 1M'}
+              {nodeData.model === 'claude-haiku-4-5' && 'Haiku 4.5: Fastest, 64K output | 200K context | $1/$5 per 1M'}
             </div>
           </div>
         )}

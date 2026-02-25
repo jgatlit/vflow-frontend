@@ -167,7 +167,7 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
     name: 'OpenAI',
     icon: '🤖',
     color: 'blue',
-    defaultModel: 'gpt-4o',
+    defaultModel: 'gpt-5',
     models: [
       // GPT-5 Series (Flagship - 400K Context)
       {

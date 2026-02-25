@@ -243,35 +243,15 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
                   Model
                 </label>
                 <select
-                  value={nodeData.model || 'gpt-4o'}
+                  value={nodeData.model || 'gpt-5'}
                   onChange={(e) => handleDataChange('model', e.target.value)}
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                 >
-                  <optgroup label="GPT-5 Series (Flagship - 400K Context)">
-                    <option value="gpt-5">GPT-5 (Flagship)</option>
-                    <option value="gpt-5-mini">GPT-5 Mini</option>
-                    <option value="gpt-5-nano">GPT-5 Nano (Fastest)</option>
-                  </optgroup>
-                  <optgroup label="Reasoning Models (o-Series)">
-                    <option value="o3-pro">o3-pro (Extended Reasoning)</option>
-                    <option value="o3">o3 (Reasoning)</option>
-                    <option value="o3-mini">o3-mini (Fast Reasoning)</option>
-                    <option value="o4-mini">o4-mini (Budget Reasoning)</option>
-                  </optgroup>
-                  <optgroup label="GPT-4.1 Series (1M Context)">
-                    <option value="gpt-4.1">GPT-4.1</option>
-                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-                    <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
-                  </optgroup>
-                  <optgroup label="GPT-4o Series (128K Context)">
-                    <option value="gpt-4o">GPT-4o</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                    <option value="gpt-4o-audio-preview">GPT-4o Audio</option>
-                  </optgroup>
-                  <optgroup label="Legacy Models">
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                  </optgroup>
+                  <option value="gpt-5">GPT-5 — Flagship General Purpose</option>
+                  <option value="gpt-5-mini">GPT-5 Mini — Fast & Affordable</option>
+                  <option value="o3">o3 — Advanced Reasoning</option>
+                  <option value="o4-mini">o4-mini — Budget Reasoning & Coding</option>
+                  <option value="gpt-4o">GPT-4o — Multimodal (Vision & Audio)</option>
                 </select>
               </div>
               <div>

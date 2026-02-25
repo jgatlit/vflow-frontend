@@ -318,7 +318,7 @@ function AppContent() {
         };
       } else if (type === 'anthropic') {
         defaultData = {
-          model: 'claude-sonnet-4-5-20250929',
+          model: 'claude-sonnet-4-5',
           temperature: 1.0,
           maxTokens: 4000,
           thinkingBudget: 10000,
@@ -355,7 +355,7 @@ function AppContent() {
       } else if (type === 'tool-augmented-llm') {
         defaultData = {
           provider: 'anthropic',
-          model: 'claude-sonnet-4-5-20250929',
+          model: 'claude-sonnet-4-5',
           temperature: 0.7,
           maxTokens: 4000,
           systemPrompt: 'You are a helpful assistant with access to tools.',

@@ -199,17 +199,9 @@ const PerplexityNode = memo(({ id, data, selected }: NodeProps) => {
                   onChange={(e) => handleDataChange('model', e.target.value)}
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                 >
-                  <optgroup label="Sonar Series">
-                    <option value="sonar">Sonar</option>
-                    <option value="sonar-pro">Sonar Pro</option>
-                  </optgroup>
-                  <optgroup label="Reasoning Series">
-                    <option value="sonar-reasoning">Sonar Reasoning</option>
-                    <option value="sonar-reasoning-pro">Sonar Reasoning Pro</option>
-                  </optgroup>
-                  <optgroup label="Deep Research">
-                    <option value="sonar-deep-research">Sonar Deep Research</option>
-                  </optgroup>
+                  <option value="sonar">Sonar — Quick Search & Facts</option>
+                  <option value="sonar-pro">Sonar Pro — Deep Search & Analysis</option>
+                  <option value="sonar-deep-research">Deep Research — Academic & Market</option>
                 </select>
               </div>
               <div>

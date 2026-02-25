@@ -675,7 +675,7 @@ export async function executeAgentNode(nodeData: any): Promise<ExecutionResult> 
       body: JSON.stringify({
         executionId,
         provider: nodeData.provider || 'anthropic',
-        model: nodeData.model || 'claude-sonnet-4-5-20250929',
+        model: nodeData.model || 'claude-sonnet-4-5',
         systemPrompt,
         userPrompt,
         temperature: nodeData.temperature || 0.7,
