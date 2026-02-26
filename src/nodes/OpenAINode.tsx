@@ -277,7 +277,7 @@ const OpenAINode = memo(({ id, data, selected }: NodeProps) => {
               </label>
               <input
                 type="number"
-                value={nodeData.maxTokens || 1000}
+                value={nodeData.maxTokens || 16000}
                 onChange={(e) => handleDataChange('maxTokens', parseInt(e.target.value))}
                 min="1"
                 max="128000"

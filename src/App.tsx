@@ -312,7 +312,7 @@ function AppContent() {
         defaultData = {
           model: 'gpt-5',
           temperature: 0.7,
-          maxTokens: 1000,
+          maxTokens: 16000,
           systemPrompt: '',
           userPrompt: '',
         };
@@ -320,8 +320,8 @@ function AppContent() {
         defaultData = {
           model: 'claude-sonnet-4-5',
           temperature: 1.0,
-          maxTokens: 4000,
-          thinkingBudget: 10000,
+          maxTokens: 16000,
+          thinkingBudget: 32000,
           systemPrompt: '',
           userPrompt: '',
           extendedThinking: false,
@@ -330,7 +330,7 @@ function AppContent() {
         defaultData = {
           model: 'gemini-2.5-flash',
           temperature: 0.7,
-          maxTokens: 2000,
+          maxTokens: 16000,
           systemPrompt: '',
           userPrompt: '',
           hybridReasoning: false,
@@ -357,7 +357,7 @@ function AppContent() {
           provider: 'anthropic',
           model: 'claude-sonnet-4-5',
           temperature: 0.7,
-          maxTokens: 4000,
+          maxTokens: 16000,
           systemPrompt: 'You are a helpful assistant with access to tools.',
           userPrompt: '',
           toolsEnabled: true,

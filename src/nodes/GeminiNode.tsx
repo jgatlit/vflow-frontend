@@ -318,7 +318,7 @@ const GeminiNode = memo(({ id, data, selected }: NodeProps) => {
             </label>
             <input
               type="number"
-              value={nodeData.maxTokens || 2000}
+              value={nodeData.maxTokens || 16000}
               onChange={(e) => handleDataChange('maxTokens', parseInt(e.target.value))}
               min="1"
               max="65536"

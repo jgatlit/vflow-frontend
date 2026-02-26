@@ -227,7 +227,7 @@ const PerplexityNode = memo(({ id, data, selected }: NodeProps) => {
               </label>
               <input
                 type="number"
-                value={nodeData.maxTokens || 2000}
+                value={nodeData.maxTokens || 4000}
                 onChange={(e) => handleDataChange('maxTokens', parseInt(e.target.value))}
                 min="1"
                 max="8000"

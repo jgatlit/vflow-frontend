@@ -679,7 +679,7 @@ export async function executeAgentNode(nodeData: any): Promise<ExecutionResult> 
         systemPrompt,
         userPrompt,
         temperature: nodeData.temperature || 0.7,
-        maxTokens: nodeData.maxTokens || 4096,
+        maxTokens: nodeData.maxTokens || 16000,
         enabledTools: nodeData.enabledTools || [],
         toolConfigs: nodeData.toolConfigs || {},
         maxAgentSteps: nodeData.maxAgentSteps || 5,

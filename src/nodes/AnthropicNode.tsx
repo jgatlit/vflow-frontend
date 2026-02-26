@@ -291,7 +291,7 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
                 </label>
                 <input
                   type="number"
-                  value={nodeData.maxTokens || 4000}
+                  value={nodeData.maxTokens || 16000}
                   onChange={(e) => handleDataChange('maxTokens', parseInt(e.target.value))}
                   min="1"
                   max="128000"
@@ -304,10 +304,10 @@ const AnthropicNode = memo(({ id, data, selected }: NodeProps) => {
                 </label>
                 <input
                   type="number"
-                  value={nodeData.thinkingBudget || 10000}
+                  value={nodeData.thinkingBudget || 32000}
                   onChange={(e) => handleDataChange('thinkingBudget', parseInt(e.target.value))}
-                  min="1000"
-                  max="100000"
+                  min="1024"
+                  max="128000"
                   step="1000"
                   className="w-full text-sm border border-gray-300 rounded px-2 py-1"
                   disabled={!nodeData.extendedThinking}
