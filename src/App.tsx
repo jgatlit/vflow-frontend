@@ -367,6 +367,25 @@ function AppContent() {
           toolBarCollapsed: false,
           statusPanelCollapsed: false,
         };
+      } else if (type === 'mermaid') {
+        defaultData = {
+          title: 'Mermaid Diagram',
+          outputVariable: newId,
+          bypassed: false,
+          diagram: 'graph TD\n  A[Start] --> B[End]',
+          inputMode: 'auto',
+          operation: 'render',
+          theme: 'default',
+          outputFormat: 'svg-string',
+          config: {},
+          activePreset: null,
+          presets: [],
+          presetSelector: '',
+          showPreview: true,
+          previewSvg: null,
+          previewError: null,
+          editorCollapsed: false,
+        };
       }
 
       const newNode = {

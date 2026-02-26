@@ -10,6 +10,7 @@ import ToolAugmentedLLMNode from './ToolAugmentedLLMNode';
 import AgentNode from './AgentNode';
 import WebhookInNode from './WebhookInNode';
 import WebhookOutNode from './WebhookOutNode';
+import MermaidNode from './MermaidNode';
 
 export const nodeTypes: NodeTypes = {
   openai: OpenAINode,
@@ -23,6 +24,7 @@ export const nodeTypes: NodeTypes = {
   agent: AgentNode,
   'webhook-in': WebhookInNode,
   'webhook-out': WebhookOutNode,
+  mermaid: MermaidNode,
 };
 
-export { OpenAINode, AnthropicNode, GeminiNode, PerplexityNode, NotesNode, PythonNode, JavaScriptNode, ToolAugmentedLLMNode, AgentNode, WebhookInNode, WebhookOutNode };
+export { OpenAINode, AnthropicNode, GeminiNode, PerplexityNode, NotesNode, PythonNode, JavaScriptNode, ToolAugmentedLLMNode, AgentNode, WebhookInNode, WebhookOutNode, MermaidNode };
