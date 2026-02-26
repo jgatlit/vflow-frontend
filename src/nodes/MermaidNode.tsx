@@ -102,16 +102,15 @@ const MermaidNode = memo(({ id, data, selected }: NodeProps) => {
   } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  // Bug 3 fix: preview SVG/error as local state (not persisted to DB)
+  const [previewSvg, setPreviewSvg] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const renderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize presets if empty
-  useEffect(() => {
-    if (!nodeData.presets || nodeData.presets.length === 0) {
-      handleDataChange('presets', BUILT_IN_PRESETS);
-    }
-  }, []);
+  // Bug 2 fix: don't copy built-ins into nodeData.presets — keep them separate
+  // nodeData.presets only stores user-created custom presets
 
   const handleDataChange = (field: keyof MermaidNodeData, value: any) => {
     updateNodeData(id, { [field]: value });
@@ -184,13 +183,13 @@ const MermaidNode = memo(({ id, data, selected }: NodeProps) => {
         if (result.svg) {
           // Sanitize SVG
           const sanitizedSvg = sanitizeSvg(result.svg);
-          handleDataChange('previewSvg', sanitizedSvg);
-          handleDataChange('previewError', null);
+          setPreviewSvg(sanitizedSvg);
+          setPreviewError(null);
         } else {
-          handleDataChange('previewError', 'Failed to render diagram');
+          setPreviewError('Failed to render diagram');
         }
       } catch (error: any) {
-        handleDataChange('previewError', error.message || 'Render failed');
+        setPreviewError(error.message || 'Render failed');
       } finally {
         setIsRendering(false);
       }
@@ -233,7 +232,9 @@ const MermaidNode = memo(({ id, data, selected }: NodeProps) => {
   };
 
   const handleLoadPreset = (presetName: string) => {
-    const preset = [...BUILT_IN_PRESETS, ...nodeData.presets].find((p) => p.name === presetName);
+    const customPresets = (nodeData.presets || []).filter((p) => !p.builtIn);
+    const preset = BUILT_IN_PRESETS.find((p) => p.name === presetName)
+      || customPresets.find((p) => p.name === presetName);
 
     if (preset) {
       handleDataChange('diagram', preset.diagram);
@@ -292,13 +293,25 @@ const MermaidNode = memo(({ id, data, selected }: NodeProps) => {
     }
   };
 
-  const allPresets = [...BUILT_IN_PRESETS, ...nodeData.presets];
+  const customPresets = (nodeData.presets || []).filter((p) => !p.builtIn);
 
   return (
     <>
-      <NodeResizer minWidth={450} minHeight={500} isVisible={selected} />
+      <NodeResizer
+        minWidth={450}
+        minHeight={500}
+        isVisible={selected}
+        lineClassName="border-cyan-500"
+        handleClassName="h-3 w-3 bg-cyan-500"
+      />
 
-      <Handle type="target" position={Position.Top} id="input" className="!bg-cyan-500" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="input"
+        className="!w-4 !h-4 !bg-cyan-500 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all"
+        style={{ zIndex: 10 }}
+      />
 
       <div
         className={`bg-white rounded-lg shadow-lg border-2 border-cyan-500 p-4 min-w-[450px] ${
@@ -407,9 +420,9 @@ const MermaidNode = memo(({ id, data, selected }: NodeProps) => {
                 </option>
               ))}
             </optgroup>
-            {nodeData.presets.length > 0 && (
+            {customPresets.length > 0 && (
               <optgroup label="Custom Presets">
-                {nodeData.presets.map((preset) => (
+                {customPresets.map((preset) => (
                   <option key={preset.name} value={preset.name}>
                     {preset.name}
                   </option>
@@ -457,10 +470,10 @@ const MermaidNode = memo(({ id, data, selected }: NodeProps) => {
           )}
 
           {/* Custom Preset List */}
-          {nodeData.presets.length > 0 && (
+          {customPresets.length > 0 && (
             <div className="mt-2 space-y-1">
               <div className="text-xs font-medium text-gray-600">Custom Presets:</div>
-              {nodeData.presets.map((preset) => (
+              {customPresets.map((preset) => (
                 <div key={preset.name} className="flex items-center gap-2 text-sm">
                   {editingPresetId === preset.name ? (
                     <>
@@ -596,18 +609,18 @@ const MermaidNode = memo(({ id, data, selected }: NodeProps) => {
                 </div>
               )}
 
-              {!isRendering && nodeData.previewError && (
-                <div className="text-sm text-red-600">{nodeData.previewError}</div>
+              {!isRendering && previewError && (
+                <div className="text-sm text-red-600">{previewError}</div>
               )}
 
-              {!isRendering && !nodeData.previewError && nodeData.previewSvg && (
+              {!isRendering && !previewError && previewSvg && (
                 <div
-                  dangerouslySetInnerHTML={{ __html: nodeData.previewSvg }}
+                  dangerouslySetInnerHTML={{ __html: previewSvg }}
                   className="flex items-center justify-center"
                 />
               )}
 
-              {!isRendering && !nodeData.previewError && !nodeData.previewSvg && (
+              {!isRendering && !previewError && !previewSvg && (
                 <div className="text-sm text-gray-500">No preview available</div>
               )}
             </div>
@@ -615,38 +628,31 @@ const MermaidNode = memo(({ id, data, selected }: NodeProps) => {
         </div>
 
         {/* Output Variable */}
-        <div className="mb-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Output Variable</label>
+        <div className="text-xs text-gray-500 mt-2 flex items-center gap-1 flex-wrap">
+          <span>Reference using</span>
+          <span className="font-mono">{'{{'}</span>
           <input
             type="text"
-            value={`{{${nodeData.outputVariable}}}`}
-            readOnly
-            className="w-full px-2 py-1 text-sm bg-gray-100 border border-gray-300 rounded cursor-not-allowed"
+            value={nodeData.outputVariable || id}
+            onChange={(e) => handleDataChange('outputVariable', e.target.value)}
+            className="bg-white px-1 py-0.5 rounded border border-cyan-300 font-mono min-w-[4ch] focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            placeholder={id}
+            style={{ width: `${Math.max(4, (nodeData.outputVariable || id).length)}ch` }}
           />
-          <div className="text-xs text-gray-500 mt-1">
-            Access output fields based on operation:
-            <ul className="list-disc list-inside ml-2">
-              <li>
-                Render: <code>{`{{${nodeData.outputVariable}.svg}}`}</code>
-              </li>
-              <li>
-                Parse: <code>{`{{${nodeData.outputVariable}.valid}}`}</code>
-              </li>
-              <li>
-                Detect: <code>{`{{${nodeData.outputVariable}.diagramType}}`}</code>
-              </li>
-              <li>
-                Extract: <code>{`{{${nodeData.outputVariable}.diagrams}}`}</code>
-              </li>
-              <li>
-                Batch: <code>{`{{${nodeData.outputVariable}.results}}`}</code>
-              </li>
-            </ul>
-          </div>
+          <span className="font-mono">{'}}'}</span>
+        </div>
+        <div className="text-xs text-gray-400 mt-1 ml-1">
+          Fields: <code>.svg</code> <code>.valid</code> <code>.diagramType</code> <code>.diagrams</code> <code>.results</code>
         </div>
       </div>
 
-      <Handle type="source" position={Position.Bottom} id="output" className="!bg-cyan-500" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="output"
+        className="!w-4 !h-4 !bg-cyan-500 !border-2 !border-white hover:!w-5 hover:!h-5 transition-all"
+        style={{ zIndex: 10 }}
+      />
     </>
   );
 });
